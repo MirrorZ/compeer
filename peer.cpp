@@ -12,34 +12,34 @@
 
 #include "common.h"
 
-#define HOSTPORT 26347
-#define HOST "127.0.0.1"
-#define FRIENDPORT 26348
-#define FRIEND "127.0.0.1"
+char listenIP[16] = "";
+char friendIP[16] = "";
+int listenport;
+int friendport;
 
 /* Set up a listener socket and returns an fd > 0 which can be used
    to accept connections */
 int setup_tcplistener(void) {
   struct sockaddr_in host_addr;
-  socklen_t addr_size = sizeof(struct sockaddr_in);
   int hostfd = socket(AF_INET, SOCK_STREAM, 0);
 
   /* Socket creation failure */
   if(hostfd == -1)
-    return -1;
-     
-  memset(&host_addr, 0, addr_size);
+    return -20;
+
+  memset(&host_addr, 0, sizeof(struct sockaddr_in));
 
   host_addr.sin_family = AF_INET;
-  host_addr.sin_port = htons(HOSTPORT);
-  inet_pton(AF_INET, HOST, &host_addr.sin_addr);
-  
-  if(bind(hostfd, (struct sockaddr *)&host_addr, addr_size) == -1)
-    return -1;
+  host_addr.sin_port = htons(listenport);
+  inet_pton(AF_INET, listenIP, &host_addr.sin_addr);
+
+  if(bind(hostfd, (struct sockaddr *)&host_addr, sizeof(struct sockaddr_in)) == -1)
+    return -21;
 
   if(listen(hostfd, 1) == -1)
-    return -1;
+    return -22;
 
+  printf("Listening on %s:%d\n", listenIP, listenport);
   return hostfd;
 }
 
@@ -48,17 +48,18 @@ int setup_tcpfriend() {
   int friendfd = socket(AF_INET, SOCK_STREAM, 0);
 
   if(friendfd == -1)
-    return -1;
+    return -30;
 
   sockaddr_in friendaddr;
   memset(&friendaddr, 0, sizeof(struct sockaddr_in));
   friendaddr.sin_family = AF_INET;
-  friendaddr.sin_port = htons(FRIENDPORT);
-  inet_pton(AF_INET, FRIEND, &friendaddr.sin_addr);
-  
-  if(connect(friendfd, (const struct sockaddr *)&friendaddr, sizeof(struct sockaddr_in)) == -1)
-    return -1;
+  friendaddr.sin_port = htons(friendport);
+  inet_pton(AF_INET, friendIP, &friendaddr.sin_addr);
 
+  if(connect(friendfd, (const struct sockaddr *)&friendaddr, sizeof(struct sockaddr_in)) == -1)
+    return -31;
+
+  printf("Connected to %s:%d\n", friendIP, friendport);
   return friendfd;
 }
 
@@ -67,22 +68,46 @@ int main(int argc, char *argv[]) {
   bool should_listen_for_connections = false;
   bool should_connect_to_friend = false;
   int connectedfd=-1;
-  
+  char USAGE[200];
+
+  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT\n\tOR\n\t%s -friend friendIP friendPort\n", argv[0], argv[0]);
+
+  /* Handle command line arguments for flexibility */
+  if(argc!=4) {
+    printf("%s", USAGE);
+    return 1;
+  }
+
+  if(!strcmp(argv[1], "-listen")) {
+    should_listen_for_connections = true;
+    strcpy(listenIP, argv[2]);
+    listenport = atoi(argv[3]);
+  }
+  else if(!strcmp(argv[1], "-friend")) {
+    should_connect_to_friend = true;
+    strcpy(friendIP, argv[2]);
+    friendport = atoi(argv[3]);
+  }
+  else {
+    printf("%s", USAGE);
+    return 2;
+  }
+
   /* Nothing to do */
   if(!should_listen_for_connections && !should_connect_to_friend)
-    return -1;
+    return 3;
   if(should_listen_for_connections && should_connect_to_friend)
-    return -1;
+    return 4;
 
   if(should_listen_for_connections) {
     listenerfd = setup_tcplistener();
-    if(listenerfd == -1)
-      return -2;
+    if(listenerfd < 0)
+      return listenerfd*-1;
   }
   else if(should_connect_to_friend) {
     connectedfd = setup_tcpfriend();
-    if(connectedfd == -1)
-      return -3;
+    if(connectedfd < 0)
+      return connectedfd*-1;
   }
 
   char buffer[1025];
@@ -92,14 +117,14 @@ int main(int argc, char *argv[]) {
   char *msg_for_friend = NULL;
   bool noonetotalkto = true;
   int nfds = 0;
-  
+
   while(1) {
 
     FD_ZERO(&readfds);
     FD_ZERO(&writefds);
 
     FD_SET(stdinfd, &readfds);
-    
+
     if(connectedfd == -1) {
       FD_SET(listenerfd, &readfds);
       nfds = listenerfd + 1;
@@ -114,14 +139,14 @@ int main(int argc, char *argv[]) {
     int selection = select(nfds, &readfds, &writefds, NULL, NULL);
 
     if(selection == -1)
-      return -1;
+      return 7;
     else if(selection) {
 
       /* Got a message over stdin */
       if(FD_ISSET(stdinfd, &readfds)) {
 
         if(read(0, buffer, 1024) < 0)
-          return -2;
+          return 8;
 
         int oldmsgfsize = strlen(msg_for_friend);
         int newmsgfsize = oldmsgfsize + strlen(buffer) + 1;
@@ -142,7 +167,7 @@ int main(int argc, char *argv[]) {
           int clientfd = accept(listenerfd, (struct sockaddr *)&clientaddr, (socklen_t *)&addrsize);
 
           if(clientfd < 0)
-            return -1;
+            return 9;
 
           connectedfd = clientfd;
         }
@@ -155,7 +180,7 @@ int main(int argc, char *argv[]) {
           int retval = read(connectedfd, buffer, sizeof(buffer));
 
           if(retval == -1)
-            return -1;
+            return 10;
           else if(retval == 0) {
             /* Bye Bye friend */
             connectedfd = -1;
@@ -173,7 +198,7 @@ int main(int argc, char *argv[]) {
             int retval = send(connectedfd, msg_for_friend, strlen(msg_for_friend), 0);
 
             if(retval == -1)
-              return -1;
+              return 11;
             else if(retval == strlen(msg_for_friend)) {
               free(msg_for_friend);
               msg_for_friend = NULL;
