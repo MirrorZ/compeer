@@ -145,17 +145,27 @@ int main(int argc, char *argv[]) {
       /* Got a message over stdin */
       if(FD_ISSET(stdinfd, &readfds)) {
 
-        if(read(0, buffer, 1024) < 0)
+        int bytes_read = read(0, buffer, 1024);
+        if(bytes_read < 0)
           return 8;
 
-        int oldmsgfsize = strlen(msg_for_friend);
-        int newmsgfsize = oldmsgfsize + strlen(buffer) + 1;
-        msg_for_friend = (char *) realloc(msg_for_friend, newmsgfsize);
-        strcpy(msg_for_friend + oldmsgfsize, buffer);
-        msg_for_friend[newmsgfsize - 1] = '\0';
+        /* We don't care about user pressing Enter directly (bytes_read = 1)*/
+        if(bytes_read > 1) {
+          /* Mask the newline character we get in from stdin */
+          buffer[bytes_read - 1] = '\0';
 
-        if(connectedfd == -1)
-          printf("[INFO] Message queued for later. No one to talk to.\n");
+          printf("Got stdin: %d bytes and %d length\n", bytes_read, strlen(buffer));
+
+          int oldmsgfsize = msg_for_friend == NULL ? 0 : strlen(msg_for_friend);
+          int newmsgfsize = oldmsgfsize + strlen(buffer) + 1;
+          msg_for_friend = (char *) realloc(msg_for_friend, newmsgfsize);
+          strcpy(msg_for_friend + oldmsgfsize, buffer);
+          msg_for_friend[newmsgfsize - 1] = '\0';
+          printf("msg: %s\n", msg_for_friend);
+
+          if(connectedfd == -1)
+            printf("[INFO] Message queued for later. No one to talk to.\n");
+        }
       }
 
       /* Some things should only happen when we are disconnected */
