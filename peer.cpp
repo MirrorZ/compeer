@@ -196,19 +196,14 @@ int main(int argc, char *argv[]) {
       }
 
       /* Got a message over TCP */ 
-      if FD_ISSET(connectedfd, &readfds){
-        printf("Got some on TCP\n", selection);
+      if(FD_ISSET(connectedfd, &readfds)) {
+        int retval = read(connectedfd, buffer, sizeof(buffer));
 
-        if(FD_ISSET(connectedfd, &readfds)) {
-          int retval = read(connectedfd, buffer, sizeof(buffer));
+        if(retval == -1)
+          return 10;
 
-          if(retval == -1)
-            return 10;
-        }
-        else {
-          buffer[retval] = '\0';
-          printf("> %s \n", buffer);
-        }
+        buffer[retval] = '\0';
+        printf("> %s \n", buffer);
       }
     }
   }
