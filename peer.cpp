@@ -17,9 +17,9 @@ char friendIP[16] = "";
 int listenport;
 int friendport;
 
-void handle_err(int err_no) {
+void handle_err(int lastcode) {
   perror(strerror(errno));
-  exit(-1);
+  exit(lastcode);
 }
 
 /* Set up a listener socket and accept connections, return connectedfd */
@@ -33,7 +33,7 @@ int setup_tcplistener(void) {
 
   /* Socket creation failure */
   if(hostfd == -1)
-    handle_err(errno);
+    handle_err(1);
 
   memset(&host_addr, 0, sizeof(struct sockaddr_in));
 
@@ -43,17 +43,17 @@ int setup_tcplistener(void) {
 
   /* Bind failure */
   if(bind(hostfd, (struct sockaddr *)&host_addr, sizeof(struct sockaddr_in)) == -1)
-    handle_err(errno);
+    handle_err(2);
 
   if(listen(hostfd, 1) == -1)
-    handle_err(errno);
+    handle_err(3);
 
   printf("Listening on %s:%d\n\n", listenIP, listenport);
 
   int clientfd = accept(hostfd, (struct sockaddr *)&clientaddr, (socklen_t *)&addrsize);
 
   if(clientfd == -1)
-    handle_err(errno);
+    handle_err(4);
   
   return clientfd;
 }
@@ -64,7 +64,7 @@ int setup_tcpfriend() {
   int friendfd = socket(AF_INET, SOCK_STREAM, 0);
 
   if(friendfd == -1)
-    handle_err(errno);
+    handle_err(5);
 
   sockaddr_in friendaddr;
   memset(&friendaddr, 0, sizeof(struct sockaddr_in));
@@ -75,7 +75,7 @@ int setup_tcpfriend() {
   printf("Connecting to %s:%d\n", friendIP, friendport);
   
   if(connect(friendfd, (const struct sockaddr *)&friendaddr, (socklen_t)sizeof(struct sockaddr_in)) == -1)
-    handle_err(errno);
+    handle_err(6);
 
   printf("Connected to %s:%d\n", friendIP, friendport);
 
@@ -131,6 +131,8 @@ int main(int argc, char *argv[]) {
     connectedfd = setup_tcpfriend();
   }
 
+  printf("Connection.\n");
+
   if(connectedfd < 0)
     return connectedfd*-1;
 
@@ -150,12 +152,15 @@ int main(int argc, char *argv[]) {
     int selection = select(nfds, &readfds, &writefds, NULL, NULL);
 
     if(selection == -1)
-      handle_err(errno);
+      handle_err(7);
     else if(selection) {
 
       /* Got a message over stdin */
       if(FD_ISSET(stdinfd, &readfds)) {
         int bytes_read = read(0, buffer, 1024);
+
+        printf("Got some on stdin\n", selection);
+
         if(bytes_read < 0)
           return 8;
 
@@ -171,44 +176,47 @@ int main(int argc, char *argv[]) {
           strcpy(msg_for_friend, buffer);
           msg_for_friend[msgfsize - 1] = '\0';
           printf("msg: %s\n", msg_for_friend);
-
-	  /* Send a message over TCP */
-          if(FD_ISSET(connectedfd, &writefds)) {
-	    if(msg_for_friend != NULL) {
-              int retval = send(connectedfd, msg_for_friend, strlen(msg_for_friend), 0);
-        
-              if(retval == -1)
-                return 11;
-              else if(retval == strlen(msg_for_friend)) {
-                free(msg_for_friend);
-                msg_for_friend = NULL;
-              }
-              else
-                msg_for_friend+=retval;
-            }
-          }
         }
       }
-      
+
+      /* Send a message over TCP */
+      if(FD_ISSET(connectedfd, &writefds)) {
+        if(msg_for_friend != NULL) {
+          int retval = send(connectedfd, msg_for_friend, strlen(msg_for_friend), 0);
+        
+          if(retval == -1)
+            return 11;
+          else if(retval == strlen(msg_for_friend)) {
+            free(msg_for_friend);
+            msg_for_friend = NULL;
+          }
+          else
+            msg_for_friend+=retval;
+        }
+      }
+
       /* Got a message over TCP */ 
-      else {
+      if FD_ISSET(connectedfd, &readfds){
+        printf("Got some on TCP\n", selection);
+
         if(FD_ISSET(connectedfd, &readfds)) {
-	  int retval = read(connectedfd, buffer, sizeof(buffer));
+          int retval = read(connectedfd, buffer, sizeof(buffer));
 
           if(retval == -1)
             return 10;
         }
         else {
-	  buffer[retval] = '\0';
+          buffer[retval] = '\0';
           printf("> %s \n", buffer);
         }
       }
     }
-  }  
+  }
+
   /* TODO: Close FDs */
   FD_ZERO(&readfds);
   FD_ZERO(&writefds);
   close(connectedfd);
-  
+
   return 0;
 }
