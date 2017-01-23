@@ -134,8 +134,81 @@ int main(int argc, char *argv[]) {
   if(connectedfd < 0)
     return connectedfd*-1;
 
-  while(1){
-    ;
-  }
+  /*
+  /* Main conversation */
+  while(1) {
+
+    FD_ZERO(&readfds);
+    FD_ZERO(&writefds);
+
+    FD_SET(stdinfd, &readfds);
+    FD_SET(connectedfd, &readfds);
+    FD_SET(connectedfd, &writefds);
+    nfds = connectedfd + 1;
+
+    /* Wait for data to arrive on the socket or stdin or a new connection */
+    int selection = select(nfds, &readfds, &writefds, NULL, NULL);
+
+    if(selection == -1)
+      handle_err(errno);
+    else if(selection) {
+
+      /* Got a message over stdin */
+      if(FD_ISSET(stdinfd, &readfds)) {
+        int bytes_read = read(0, buffer, 1024);
+        if(bytes_read < 0)
+          return 8;
+
+        /* We don't care about user pressing Enter directly (bytes_read = 1)*/
+        if(bytes_read > 1) {
+          /* Mask the newline character we get in from stdin */
+          buffer[bytes_read - 1] = '\0';
+
+          printf("Got stdin: %d bytes and %d length\n", bytes_read, (int)strlen(buffer));
+
+          int msgfsize = strlen(buffer) + 1;
+          msg_for_friend = (char *) realloc(msg_for_friend, msgfsize);
+          strcpy(msg_for_friend, buffer);
+          msg_for_friend[msgfsize - 1] = '\0';
+          printf("msg: %s\n", msg_for_friend);
+
+	  /* Send a message over TCP */
+          if(FD_ISSET(connectedfd, &writefds)) {
+	    if(msg_for_friend != NULL) {
+              int retval = send(connectedfd, msg_for_friend, strlen(msg_for_friend), 0);
+        
+              if(retval == -1)
+                return 11;
+              else if(retval == strlen(msg_for_friend)) {
+                free(msg_for_friend);
+                msg_for_friend = NULL;
+              }
+              else
+                msg_for_friend+=retval;
+            }
+          }
+        }
+      }
+      
+      /* Got a message over TCP */ 
+      else {
+        if(FD_ISSET(connectedfd, &readfds)) {
+	  int retval = read(connectedfd, buffer, sizeof(buffer));
+
+          if(retval == -1)
+            return 10;
+        }
+        else {
+	  buffer[retval] = '\0';
+          printf("> %s \n", buffer);
+        }
+      }
+    }
+  }  
+  /* TODO: Close FDs */
+  FD_ZERO(&readfds);
+  FD_ZERO(&writefds);
+  close(connectedfd);
+  
   return 0;
 }
