@@ -17,3 +17,4 @@ Feel free to add issues, submit patches
 Ideas are welcome!
 
 Contact chandrika3437@gmail.com
+Handle SIGINT in peer.cpp

@@ -1,4 +1,3 @@
-#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -159,7 +158,7 @@ int main(int argc, char *argv[]) {
       if(FD_ISSET(stdinfd, &readfds)) {
         int bytes_read = read(0, buffer, 1024);
 
-        printf("Got some on stdin\n", selection);
+        //        printf("Got some on stdin\n", selection);
 
         if(bytes_read < 0)
           return 8;
@@ -169,7 +168,7 @@ int main(int argc, char *argv[]) {
           /* Mask the newline character we get in from stdin */
           buffer[bytes_read - 1] = '\0';
 
-          printf("Got stdin: %d bytes and %d length\n", bytes_read, (int)strlen(buffer));
+          //          printf("Got stdin: %d bytes and %d length\n", bytes_read, (int)strlen(buffer));
 
           int msgfsize = strlen(buffer) + 1;
           msg_for_friend = (char *) realloc(msg_for_friend, msgfsize);
