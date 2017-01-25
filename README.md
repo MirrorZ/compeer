@@ -5,7 +5,7 @@ Decentralised peer to peer messenger
 
 ### TODO
 
--Handle multiple messages correctly-
+~~Handle multiple messages correctly~~
 * Handle disconnection;
 * Add Signal Handlers 
 * Enable Encryption
