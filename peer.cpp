@@ -1,3 +1,4 @@
+#include <iostream.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -11,86 +12,131 @@
 
 //#include "common.h"
 
-char listenIP[16] = "";
-char friendIP[16] = "";
-int listenport;
-int friendport;
-
 void handle_err(int lastcode) {
   perror(strerror(errno));
   exit(lastcode);
 }
 
-/* Set up a listener socket and accept connections, return connectedfd */
-int setup_tcplistener(void) {
-
-  struct sockaddr_in host_addr;
-  struct sockaddr_in clientaddr;
-  socklen_t addrsize;
+/* Packing the necessary data structures required for the peer */
+class peeraddr {
   
-  int hostfd = socket(AF_INET, SOCK_STREAM, 0);
+  public:
+
+  struct sockaddr_in addr;
+  socklen_t addr_size;
+  
+  char ipv4[16];
+  int port;
+
+  peeraddr(void) {
+    addr_size = sizeof(struct sockaddr_in);
+  }
+
+  /* Stick to TCP right now 
+     TODO: overload this to create UDP sockets
+  */
+  peeraddr(char ipaddr[], int portnum);
+
+  /* TODO: add get_ip,port for peers connected */
+
+};
+
+void peeraddr::peeraddr(char ipaddr[], int portnum) {
+    strcpy(ip4v, ipaddr);
+    port = portnum;
+    addr_size = sizeof(struct sockaddr_in);
+
+    if(memset(addr, 0, addr_size))
+      handle_err(errno);
+
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    inet_pton(AF_INET, ipv4, &addr.sin_addr);
+}
+
+class peer {
+public:
+  peeraddr listen_addr;              
+  int listenfd;
+  peeraddr friend_addr;              
+  int friendfd;
+    
+  /* Set up a listener socket and accept connections, return connectedfd */
+  int tcp_listener(peeraddr laddr);
+
+  u/* Returns an fd > 0 which can be used to send and receive messages to/from a friend */
+  int tcp_friend(peeraddr faddr);
+};
+
+
+int peer::tcp_listener(peeraddr laddr) {
+  
+  this.listen_addr = laddr;
+  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
   /* Socket creation failure */
-  if(hostfd == -1)
+  if(sockfd == -1)
     handle_err(1);
 
-  memset(&host_addr, 0, sizeof(struct sockaddr_in));
-
-  host_addr.sin_family = AF_INET;
-  host_addr.sin_port = htons(listenport);
-  inet_pton(AF_INET, listenIP, &host_addr.sin_addr);
+  this.listenfd = hostfd;
 
   /* Bind failure */
-  if(bind(hostfd, (struct sockaddr *)&host_addr, sizeof(struct sockaddr_in)) == -1)
+  if(bind(this.listenfd, (struct sockaddr *)&this.listen_addr.addr, this.listen_addr.addr_size) == -1)
     handle_err(2);
 
-  if(listen(hostfd, 1) == -1)
+  / * Listen for peer */
+  if(listen(this.listenfd, 1) == -1)
     handle_err(3);
 
-  printf("Listening on %s:%d\n\n", listenIP, listenport);
+  printf("Listening on %s:%d\n\n", this.listen_addr.ipv4, this.listen_addr.port);
 
-  int clientfd = accept(hostfd, (struct sockaddr *)&clientaddr, (socklen_t *)&addrsize);
+  int clientfd = accept(this.sockfd, (struct sockaddr *)&this.friend_addr.addr, (socklen_t *)&this.friend_addr.addrsize);
 
   if(clientfd == -1)
     handle_err(4);
-  
-  return clientfd;
+
+  this.friendfd = clientfd
+
+  return this.friendfd;
 }
 
-/* Returns an fd > 0 which can be used to send and receive messages to/from a friend */
-int setup_tcpfriend() {
+int peer::tcp_friend(peeraddr faddr) {
 
-  int friendfd = socket(AF_INET, SOCK_STREAM, 0);
+  this.friend_addr = faddr;
 
-  if(friendfd == -1)
+  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+  if(sockfd == -1)
     handle_err(5);
 
-  sockaddr_in friendaddr;
-  memset(&friendaddr, 0, sizeof(struct sockaddr_in));
-  friendaddr.sin_family = AF_INET;
-  friendaddr.sin_port = htons(friendport);
-  inet_pton(AF_INET, friendIP, &friendaddr.sin_addr);
+  this.friendfd = sockfd;
 
-  printf("Connecting to %s:%d\n", friendIP, friendport);
+  printf("Connecting to %s:%d\n", faddr.ipv4, faddr.port);
+
   
-  if(connect(friendfd, (const struct sockaddr *)&friendaddr, (socklen_t)sizeof(struct sockaddr_in)) == -1)
+  if(connect(this.friendfd, (const struct sockaddr *)&faddr.addr, faddr.addr_size) == -1)
     handle_err(6);
 
-  printf("Connected to %s:%d\n", friendIP, friendport);
+  printf("Connected to %s:%d\n", faddr.ipv4, faddr.port);
 
-  return friendfd;
+  return this.friendfd;
 }
 
 int main(int argc, char *argv[]) {
+  
   bool should_listen_for_connections = false;
   bool should_connect_to_friend = false;
-  int connectedfd=-1;
+  
   char USAGE[200];
   char buffer[1025];
+
   fd_set readfds;
   fd_set writefds;
+
   int retval, stdinfd, nfds;;
+
   char *msg_for_friend = NULL;
+
   //bool noonetotalkto = true;
   stdinfd = nfds = 0;
 
@@ -124,10 +170,14 @@ int main(int argc, char *argv[]) {
     return 4;
 
   if(should_listen_for_connections) {
-    connectedfd = setup_tcplistener();
+    peeraddr listen_addr(listenIP, listenport);
+    peer listener;
+    connectedfd = listener.tcp_listener(listen_addr);
   }
   else if(should_connect_to_friend) {
-    connectedfd = setup_tcpfriend();
+    peeraddr friend_addr(friendIP, friendport);
+    peer remote_friend;
+    connectedfd = remote_friend.tcp_friend();
   }
 
   printf("Connection.\n");
@@ -207,10 +257,10 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  /* TODO: Close FDs */
   FD_ZERO(&readfds);
   FD_ZERO(&writefds);
   close(connectedfd);
-
+  if (should_listen_for_connections)
+    close(peer.listenfd);
   return 0;
 }
