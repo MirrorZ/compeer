@@ -9,6 +9,7 @@ Decentralised peer to peer messenger
 * Handle disconnection;
 * Add Signal Handlers 
 * Enable Encryption
+* Handle SIGINT
 
 ### Suggestions/Issues
 
