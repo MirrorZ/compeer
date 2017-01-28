@@ -9,8 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-
-//#include "common.h"
+#include <signal.h>
 
 void handle_err(int lastcode) {
   perror(strerror(errno));
@@ -122,6 +121,12 @@ int peer::tcp_friend(peeraddr faddr) {
   return this->friendfd;
 }
 
+void SIGINT_handler(int signum) {
+  /* Close all TCP connections */
+
+}
+
+
 int main(int argc, char *argv[]) {
 
   bool should_listen_for_connections = false;
@@ -173,6 +178,13 @@ int main(int argc, char *argv[]) {
   if(should_listen_for_connections && should_connect_to_friend)
     return 4;
 
+  /* Set up a SIGINT catch */
+  struct sigaction SIGINT_ACTION;
+  memset(&SIGINT_ACTION, 0, sizeof(struct sigaction));
+  SIGINT_ACTION.sa_handler = SIGINT_handler;
+  if(sigaction(SIGINT, &SIGINT_ACTION, NULL) == -1)
+    return 5;
+
   if(should_listen_for_connections) {
     peeraddr listen_addr(listenIP, listenport);
     connectedfd = listener.tcp_listener(listen_addr);
@@ -185,9 +197,8 @@ int main(int argc, char *argv[]) {
   printf("Connection.\n");
 
   if(connectedfd < 0)
-    return connectedfd*-1;
+    return connectedfd * -1;
 
-  /*
   /* Main conversation */
   while(1) {
 
@@ -220,7 +231,7 @@ int main(int argc, char *argv[]) {
           /* Mask the newline character we get in from stdin */
           buffer[bytes_read - 1] = '\0';
 
-          //          printf("Got stdin: %d bytes and %d length\n", bytes_read, (int)strlen(buffer));
+          // printf("Got stdin: %d bytes and %d length\n", bytes_read, (int)strlen(buffer));
 
           int msgfsize = strlen(buffer) + 1;
           msg_for_friend = (char *) realloc(msg_for_friend, msgfsize);
@@ -262,7 +273,9 @@ int main(int argc, char *argv[]) {
   FD_ZERO(&readfds);
   FD_ZERO(&writefds);
   close(connectedfd);
+
   if (should_listen_for_connections)
     close(listener.listenfd);
+
   return 0;
 }
