@@ -109,7 +109,6 @@ public:
     if(fd_other_side > 0)
       close(fd_other_side);
   }
-
 };
 
 /* ITEM-1 : Uncomment this block if really required. Kept around if needed later.
@@ -197,6 +196,7 @@ int main(int argc, char *argv[]) {
     }
     else if(selection) {
 
+      printf(" ===> Number of descriptors from select(): %d\n", selection);
       /* Exceptions with the connected peer */
       if(FD_ISSET(connectedfd, &exceptfds)) {
         myself.stop();
@@ -205,6 +205,7 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over stdin */
       if(FD_ISSET(stdinfd, &readfds)) {
+        printf(" ===> stdin ready for reading!\n");
         int bytes_read = read(0, buffer, 1024);
 
         if(bytes_read < 0) {
