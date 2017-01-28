@@ -121,11 +121,11 @@ int peer::tcp_friend(peeraddr faddr) {
   return this->friendfd;
 }
 
+/* ITEM-1 : Uncomment this block if really required. Kept around if needed later.
 void SIGINT_handler(int signum) {
-  /* Close all TCP connections */
-
+  Close all TCP connections?
 }
-
+*/
 
 int main(int argc, char *argv[]) {
 
@@ -137,6 +137,7 @@ int main(int argc, char *argv[]) {
 
   fd_set readfds;
   fd_set writefds;
+  fd_set exceptfds;
 
   int retval, stdinfd, nfds;
 
@@ -178,12 +179,13 @@ int main(int argc, char *argv[]) {
   if(should_listen_for_connections && should_connect_to_friend)
     return 4;
 
+  /* ITEM-1 : Uncomment this block if really required. Kept around if needed later.
   /* Set up a SIGINT catch */
-  struct sigaction SIGINT_ACTION;
-  memset(&SIGINT_ACTION, 0, sizeof(struct sigaction));
-  SIGINT_ACTION.sa_handler = SIGINT_handler;
-  if(sigaction(SIGINT, &SIGINT_ACTION, NULL) == -1)
-    return 5;
+  // struct sigaction SIGINT_ACTION;
+  // memset(&SIGINT_ACTION, 0, sizeof(struct sigaction));
+  // SIGINT_ACTION.sa_handler = SIGINT_handler;
+  // if(sigaction(SIGINT, &SIGINT_ACTION, NULL) == -1)
+  //   return 5;
 
   if(should_listen_for_connections) {
     peeraddr listen_addr(listenIP, listenport);
@@ -204,18 +206,26 @@ int main(int argc, char *argv[]) {
 
     FD_ZERO(&readfds);
     FD_ZERO(&writefds);
+    FD_ZERO(&exceptfds);
 
     FD_SET(stdinfd, &readfds);
     FD_SET(connectedfd, &readfds);
     FD_SET(connectedfd, &writefds);
+    FD_SET(connectedfd, &exceptfds);
     nfds = connectedfd + 1;
 
     /* Wait for data to arrive on the socket or stdin or a new connection */
-    int selection = select(nfds, &readfds, &writefds, NULL, NULL);
+    int selection = select(nfds, &readfds, &writefds, &exceptfds, NULL);
 
     if(selection == -1)
       handle_err(7);
     else if(selection) {
+
+      /* Exceptions with the connected peer */
+      if(FD_ISSET(connectedfd, &exceptfds)) {
+        close(connectedfd);
+        return 18;
+      }
 
       /* Got a message over stdin */
       if(FD_ISSET(stdinfd, &readfds)) {
@@ -263,6 +273,15 @@ int main(int argc, char *argv[]) {
 
         if(retval == -1)
           return 10;
+
+        if(retval == 0) {
+          close(connectedfd);
+
+          if (should_listen_for_connections)
+            close(listener.listenfd);
+
+          return 0;
+        }
 
         buffer[retval] = '\0';
         printf("> %s \n", buffer);
