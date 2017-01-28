@@ -264,6 +264,7 @@ int main(int argc, char *argv[]) {
 
   FD_ZERO(&readfds);
   FD_ZERO(&writefds);
+  FD_ZERO(&exceptfds);
   myself.stop();
 
   return 0;
