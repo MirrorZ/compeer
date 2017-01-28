@@ -19,12 +19,12 @@ void handle_err(int lastcode) {
 
 /* Packing the necessary data structures required for the peer */
 class peeraddr {
-  
+
   public:
 
   struct sockaddr_in addr;
   socklen_t addr_size;
-  
+
   char ipv4[16];
   int port;
 
@@ -32,7 +32,7 @@ class peeraddr {
     addr_size = sizeof(struct sockaddr_in);
   }
 
-  /* Stick to TCP right now 
+  /* Stick to TCP right now
      TODO: overload this to create UDP sockets
   */
   peeraddr(char ipaddr[], int portnum);
@@ -56,11 +56,11 @@ peeraddr::peeraddr(char ipaddr[], int portnum) {
 
 class peer {
 public:
-  peeraddr listen_addr;              
+  peeraddr listen_addr;
   int listenfd;
-  peeraddr friend_addr;              
+  peeraddr friend_addr;
   int friendfd;
-    
+
   /* Set up a listener socket and accept connections, return connectedfd */
   int tcp_listener(peeraddr laddr);
 
@@ -70,7 +70,7 @@ public:
 
 
 int peer::tcp_listener(peeraddr laddr) {
-  
+
   this->listen_addr = laddr;
   int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -113,7 +113,7 @@ int peer::tcp_friend(peeraddr faddr) {
 
   printf("Connecting to %s:%d\n", faddr.ipv4, faddr.port);
 
-  
+
   if(connect(this->friendfd, (const struct sockaddr *)&faddr.addr, faddr.addr_size) == -1)
     handle_err(6);
 
@@ -123,10 +123,10 @@ int peer::tcp_friend(peeraddr faddr) {
 }
 
 int main(int argc, char *argv[]) {
-  
+
   bool should_listen_for_connections = false;
   bool should_connect_to_friend = false;
-  
+
   char USAGE[200];
   char buffer[1025];
 
@@ -234,7 +234,7 @@ int main(int argc, char *argv[]) {
       if(FD_ISSET(connectedfd, &writefds)) {
         if(msg_for_friend != NULL) {
           int retval = send(connectedfd, msg_for_friend, strlen(msg_for_friend), 0);
-        
+
           if(retval == -1)
             return 11;
           else if(retval == strlen(msg_for_friend)) {
@@ -246,7 +246,7 @@ int main(int argc, char *argv[]) {
         }
       }
 
-      /* Got a message over TCP */ 
+      /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
         int retval = read(connectedfd, buffer, sizeof(buffer));
 
