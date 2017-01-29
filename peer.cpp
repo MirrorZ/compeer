@@ -109,7 +109,7 @@ public:
 
     /* out_file */ 
     if(file_output.length() > 0) {
-      fd_output_file = open(file_output.c_str(), O_WRONLY);
+      fd_output_file = open(file_output.c_str(), O_WRONLY | O_CREAT);
       if(fd_output_file == -1) {
         stop();
         return -5;
@@ -257,7 +257,10 @@ int main(int argc, char *argv[]) {
     FD_SET(connectedfd, &readfds);
     /* ITEM-3 : Only add connectedfd to write fdset if we have data waiting to be written */
     FD_SET(connectedfd, &writefds);
+    FD_SET(myself.get_fd_out(), &writefds);
     FD_SET(connectedfd, &exceptfds);
+    FD_SET(myself.get_fd_in(), &exceptfds);
+
     nfds = (connectedfd > myself.get_fd_in() ? connectedfd : myself.get_fd_in()) + 1;
 
     /* Wait for data to arrive on the socket or stdin or a new connection */
@@ -269,7 +272,7 @@ int main(int argc, char *argv[]) {
     }
     else if(selection) {
 
-      printf("select returned : %d", selection);
+      // printf("select returned : %d", selection);
 
       /* Exceptions with the connected peer */
       if(FD_ISSET(connectedfd, &exceptfds)) {
@@ -279,13 +282,18 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over stdin */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
-        printf("INSIDE READ FD~!\n");
+        int bytes_read = read(myself.get_fd_in(), buffer, 1024);
 
-        int bytes_read = read(0, buffer, 1024);
+        printf("Bytes read : %d\n", bytes_read);
 
         if(bytes_read < 0) {
           myself.stop();
           return 8;
+        }
+
+        if(bytes_read == 0) {
+          myself.stop();
+          return 0;
         }
 
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
