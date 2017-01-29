@@ -109,7 +109,7 @@ public:
 
     /* out_file */ 
     if(file_output.length() > 0) {
-      fd_output_file = open(file_output.c_str(), O_WRONLY | O_CREAT);
+      fd_output_file = open(file_output.c_str(), O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG);
       if(fd_output_file == -1) {
         stop();
         return -5;
