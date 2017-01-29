@@ -294,10 +294,12 @@ int main(int argc, char *argv[]) {
     }
     else if(selection) {
 
-      // printf("select returned : %d", selection);
       /* Exceptions with the connected peer */
       /* ITEM-n Replace with a list of peers ? Or atleast an || condition for other fd */
-      if(FD_ISSET(connectedfd, &exceptfds)) {
+      if(FD_ISSET(connectedfd, &exceptfds) ||
+         FD_ISSET(myself.get_fd_in(), &exceptfds) ||
+         FD_ISSET(myself.get_fd_out(), &exceptfds)) {
+
         myself.stop();
         return 18;
       }
@@ -305,7 +307,7 @@ int main(int argc, char *argv[]) {
       /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
         int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer) - 1);
-        printf("[STDIN] Bytes read : %d\n", bytes_read);
+        printf("Bytes read stdin: %d\n", bytes_read);
 
         if(bytes_read < 0) {
           myself.stop();
@@ -337,31 +339,52 @@ int main(int argc, char *argv[]) {
         }
 
         msg_for_friend_length+=bytes_read;
-        printf("msg_friend_lenth: %d\n", msg_for_friend_length);
+        printf("msg_for_friend_length: %d\n", msg_for_friend_length);
       }
     
+      /* Write a message to peer's output fd */
+      if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
+        int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
+
+        if(bytes_written == -1) {
+          myself.stop();
+          return 11;
+        }
+
+        total_bytes_out += bytes_written;
+        printf("total_bytes_out: %d\n", total_bytes_out);
+
+        if(bytes_written == msg_for_us_length) {
+          free(msg_for_us);
+          msg_for_us = NULL;
+          msg_for_us_length = 0;
+        }
+        else {
+          msg_for_us += bytes_written;
+          msg_for_us_length -= bytes_written;
+        }
+      }
+
       /* Send a message over TCP */
-      if(FD_ISSET(connectedfd, &writefds)) {
-        if(msg_for_friend != NULL) {
-          int bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
+      if(FD_ISSET(connectedfd, &writefds) && msg_for_friend_length > 0) {
+        int bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
 
-          if(bytes_written_tcp == -1) {
-            myself.stop();
-            return 11;
-          }
+        if(bytes_written_tcp == -1) {
+          myself.stop();
+          return 11;
+        }
 
-          total_bytes_tcp_out += bytes_written_tcp;
-          printf("Total bytes tcp out: %d\n", total_bytes_tcp_out);
+        total_bytes_tcp_out += bytes_written_tcp;
+        printf("total_bytes_tcp_out: %d\n", total_bytes_tcp_out);
 
-          if(bytes_written_tcp == msg_for_friend_length) {
-            free(msg_for_friend);
-            msg_for_friend = NULL;
-            msg_for_friend_length = 0;
-          }
-          else {
-            msg_for_friend += bytes_written_tcp;
-            msg_for_friend_length -= bytes_written_tcp;
-          }
+        if(bytes_written_tcp == msg_for_friend_length) {
+          free(msg_for_friend);
+          msg_for_friend = NULL;
+          msg_for_friend_length = 0;
+        }
+        else {
+          msg_for_friend += bytes_written_tcp;
+          msg_for_friend_length -= bytes_written_tcp;
         }
       }
 
@@ -397,29 +420,6 @@ int main(int argc, char *argv[]) {
 
         msg_for_us_length+=bytes_read_tcp;
         printf("msg_for_us_length: %d\n", msg_for_us_length);
-      }
-
-      /* Write a message to peer's output fd */
-      if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
-        int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
-
-        if(bytes_written == -1) {
-          myself.stop();
-          return 11;
-        }
-
-        total_bytes_out += bytes_written;
-        printf("total_bytes_out: %d\n", total_bytes_out);
-
-        if(bytes_written == msg_for_us_length) {
-          free(msg_for_us);
-          msg_for_us = NULL;
-          msg_for_us_length = 0;
-        }
-        else {
-          msg_for_us += bytes_written;
-          msg_for_us_length -= bytes_written;
-        }
       }
     }
   }
