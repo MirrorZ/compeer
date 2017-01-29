@@ -116,6 +116,9 @@ public:
       }
     }
 
+    printf("[SETUP] input file descriptor : %d\n", fd_input_file);
+    printf("[SETUP] output file descriptor : %d\n", fd_output_file);
+
     return 0;
   }
 
@@ -183,7 +186,7 @@ int main(int argc, char *argv[]) {
 
   nfds = 0;
 
-  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] \n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [ -outfile]\n", argv[0], argv[0]);
+  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [ -outfile] [ -inoutfile ]\n", argv[0], argv[0]);
 
   /* Handle command line arguments for flexibility */
   if(argc < 4 || argc > 5) {
@@ -192,11 +195,9 @@ int main(int argc, char *argv[]) {
   }
 
   if(!strcmp(argv[1], "-listen")) {
-    printf("Set peermode to WAIT\n");
     peermode = WAIT_FOR_FRIEND;
   }
   else if(!strcmp(argv[1], "-friend")) {
-    printf("Set peermode to CONNECT\n");
     peermode = CONNECT_TO_FRIEND;
   }
   else {
@@ -257,7 +258,7 @@ int main(int argc, char *argv[]) {
     /* ITEM-3 : Only add connectedfd to write fdset if we have data waiting to be written */
     FD_SET(connectedfd, &writefds);
     FD_SET(connectedfd, &exceptfds);
-    nfds = connectedfd + 1;
+    nfds = (connectedfd > myself.get_fd_in() ? connectedfd : myself.get_fd_in()) + 1;
 
     /* Wait for data to arrive on the socket or stdin or a new connection */
     int selection = select(nfds, &readfds, &writefds, &exceptfds, NULL);
@@ -268,6 +269,8 @@ int main(int argc, char *argv[]) {
     }
     else if(selection) {
 
+      printf("select returned : %d", selection);
+
       /* Exceptions with the connected peer */
       if(FD_ISSET(connectedfd, &exceptfds)) {
         myself.stop();
@@ -276,6 +279,8 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over stdin */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
+        printf("INSIDE READ FD~!\n");
+
         int bytes_read = read(0, buffer, 1024);
 
         if(bytes_read < 0) {
