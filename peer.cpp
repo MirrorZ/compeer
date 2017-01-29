@@ -67,8 +67,8 @@ public:
     printf("[SETUP] MODE : %s\n", mode_to_set == WAIT_FOR_FRIEND ? "WAIT_FOR_FRIEND" :
            mode_to_set == CONNECT_TO_FRIEND ? "CONNECT_TO_FRIEND" : "UNKNOWN");
     printf("[SETUP] IP:Port : %s:%d\n", IP, port);
-    printf("[SETUP] input file : %s\n", infile == NULL ? "stdin" : infile);
-    printf("[SETUP] output file : %s\n", outfile == NULL ? "stdout" : outfile);
+    //    printf("[SETUP] input file : %s\n", infile == NULL ? "stdin" : infile);
+    //    printf("[SETUP] output file : %s\n", outfile == NULL ? "stdout" : outfile);
 
     mode = mode_to_set;
 
@@ -119,8 +119,8 @@ public:
       }
     }
 
-    printf("[SETUP] input file descriptor : %d\n", fd_input_file);
-    printf("[SETUP] output file descriptor : %d\n", fd_output_file);
+    //printf("[SETUP] input file descriptor : %d\n", fd_input_file);
+    //printf("[SETUP] output file descriptor : %d\n", fd_output_file);
 
     return 0;
   }
@@ -198,10 +198,11 @@ int main(int argc, char *argv[]) {
 
   nfds = 0;
 
-  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [ -outfile] [ -inoutfile ]\n", argv[0], argv[0]);
+  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ]\n", argv[0], argv[0]);
+  //sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [ -outfile] [ -inoutfile ]\n", argv[0], argv[0]);
 
   /* Handle command line arguments for flexibility */
-  if(argc < 4 || argc > 5) {
+  if(argc != 4) {
     printf("%s", USAGE);
     return 1;
   }
@@ -256,7 +257,7 @@ int main(int argc, char *argv[]) {
     errexit(-2);
   }
 
-  printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
+  // printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
   int logfile = 0;
 
   /* Main conversation */
@@ -298,7 +299,7 @@ int main(int argc, char *argv[]) {
       /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
         int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer) - 1);
-        printf("[STDIN] Bytes read : %d\n", bytes_read);
+        // printf("[STDIN] Bytes read : %d\n", bytes_read);
 
         if(bytes_read < 0) {
           myself.stop();
@@ -312,7 +313,7 @@ int main(int argc, char *argv[]) {
         }
 
         total_bytes += bytes_read;
-        printf("total : %d\n", total_bytes);
+        // printf("total : %d\n", total_bytes);
 
         if(logfile == 0)
           logfile=open("LOG", O_CREAT | O_WRONLY, S_IRWXU);
@@ -321,11 +322,11 @@ int main(int argc, char *argv[]) {
 
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
         if(bytes_read > 1) {
-          dprintf(logfile, "%s", buffer);
+          // dprintf(logfile, "%s", buffer);
           /* Mask the newline character we get in from stdin */
           int oldmsgsize = (msg_for_friend == NULL ? 0 : strlen(msg_for_friend));
           int newmsgsize = oldmsgsize + bytes_read + 1;
-          printf("[GOT STDIN] old : %d, new %d\n", oldmsgsize, newmsgsize);
+          // printf("[GOT STDIN] old : %d, new %d\n", oldmsgsize, newmsgsize);
           msg_for_friend = (char *) realloc(msg_for_friend, newmsgsize);
           strncpy(msg_for_friend + oldmsgsize, buffer, bytes_read);
           msg_for_friend[newmsgsize - 1] = '\0';
@@ -367,7 +368,7 @@ int main(int argc, char *argv[]) {
 
         int oldmsgsize = (msg_for_us == NULL ? 0 : strlen(msg_for_us));
         int newmsgsize = oldmsgsize + retval + 1;
-        printf("[GOT TCP] old : %d, new %d\n", oldmsgsize, newmsgsize);
+        // printf("[GOT TCP] old : %d, new %d\n", oldmsgsize, newmsgsize);
         msg_for_us = (char *) realloc(msg_for_us, newmsgsize);
         strncpy(msg_for_us + oldmsgsize, buffer, retval);
         msg_for_us[newmsgsize - 1] = '\0';
