@@ -160,6 +160,12 @@ public:
 
     if(fd_other_side > 0)
       close(fd_other_side);
+
+    if(fd_input_file > 0)
+      close(fd_input_file);
+
+    if(fd_output_file > 0)
+      close(fd_output_file);
   }
 };
 
@@ -300,13 +306,11 @@ int main(int argc, char *argv[]) {
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
         if(bytes_read > 1) {
           /* Mask the newline character we get in from stdin */
-          buffer[bytes_read - 1] = '\0';
-
           int oldmsgsize = (msg_for_friend == NULL ? 0 : strlen(msg_for_friend));
           int newmsgsize = oldmsgsize + bytes_read + 1;
           printf("[GOT STDIN] old : %d, new %d\n", oldmsgsize, newmsgsize);
           msg_for_friend = (char *) realloc(msg_for_friend, newmsgsize);
-          strcpy(msg_for_friend + oldmsgsize, buffer);
+          strncpy(msg_for_friend + oldmsgsize, buffer, bytes_read);
           msg_for_friend[newmsgsize - 1] = '\0';
           printf("msg for friend: %s\n", msg_for_friend);
         }
@@ -348,7 +352,7 @@ int main(int argc, char *argv[]) {
         int newmsgsize = oldmsgsize + retval + 1;
         printf("[GOT TCP] old : %d, new %d\n", oldmsgsize, newmsgsize);
         msg_for_us = (char *) realloc(msg_for_us, newmsgsize);
-        strcpy(msg_for_us + oldmsgsize, buffer);
+        strncpy(msg_for_us + oldmsgsize, buffer, retval);
         msg_for_us[newmsgsize - 1] = '\0';
         printf("msg for us: %s\n", msg_for_us);
       }
