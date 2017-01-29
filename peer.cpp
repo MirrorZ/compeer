@@ -176,12 +176,6 @@ public:
   }
 };
 
-/* ITEM-1 : Uncomment this block if really required. Kept around if needed later.
-void SIGINT_handler(int signum) {
-  Close all TCP connections?
-}
-*/
-
 int main(int argc, char *argv[]) {
 
   char USAGE[200];
@@ -247,16 +241,6 @@ int main(int argc, char *argv[]) {
       errexit(-1);
   }
 
-  /*
-     ITEM-1 : Uncomment this block if really required. Kept around if needed later.
-     // Set up a SIGINT catch
-     // struct sigaction SIGINT_ACTION;
-     // memset(&SIGINT_ACTION, 0, sizeof(struct sigaction));
-     // SIGINT_ACTION.sa_handler = SIGINT_handler;
-     // if(sigaction(SIGINT, &SIGINT_ACTION, NULL) == -1)
-     // return 5;
-  */
-
   connectedfd = myself.start();
   if(connectedfd < 0) {
     errexit(-2);
@@ -274,10 +258,14 @@ int main(int argc, char *argv[]) {
 
     FD_SET(myself.get_fd_in(), &readfds);
     FD_SET(connectedfd, &readfds);
-    /* ITEM-3 : Only add connectedfd to write fdset if we have data waiting to be written */
-    FD_SET(connectedfd, &writefds);
+
+    if(msg_for_friend_length > 0)
+      FD_SET(connectedfd, &writefds);
+
+    if(msg_for_us_length > 0)
+      FD_SET(myself.get_fd_out(), &writefds);
+
     FD_SET(connectedfd, &exceptfds);
-    FD_SET(myself.get_fd_out(), &writefds);
     FD_SET(myself.get_fd_in(), &exceptfds);
     FD_SET(myself.get_fd_out(), &exceptfds);
 
@@ -330,9 +318,9 @@ int main(int argc, char *argv[]) {
           myself.stop();
           errexit(9);
         }
-          
+
         int i = 0;
-        for(char *d = msg_for_friend + msg_for_friend_length; 
+        for(char *d = msg_for_friend + msg_for_friend_length;
             i < bytes_read;
             d++, i++) {
           *d = *(buffer+i);
@@ -341,7 +329,7 @@ int main(int argc, char *argv[]) {
         msg_for_friend_length+=bytes_read;
         printf("msg_for_friend_length: %d\n", msg_for_friend_length);
       }
-    
+
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
         int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
@@ -412,7 +400,7 @@ int main(int argc, char *argv[]) {
         }
 
         int i = 0;
-        for(char *d = msg_for_us + msg_for_us_length; 
+        for(char *d = msg_for_us + msg_for_us_length;
             i < bytes_read_tcp;
             d++, i++) {
           *d = *(buffer+i);
