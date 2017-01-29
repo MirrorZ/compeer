@@ -1,4 +1,3 @@
-#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -13,13 +12,17 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <algorithm>
+#include <iostream>
 
 #define CONNECT_TO_FRIEND 999
 #define WAIT_FOR_FRIEND   998
 #define IN_FILE "/tmp/peerin"
 #define OUT_FILE "/tmp/peerout"
 
-int total_bytes = 0;
+int total_bytes_in = 0;
+int total_bytes_tcp_in = 0;
+int total_bytes_out = 0;
+int total_bytes_tcp_out = 0;
 
 void errexit(int lastcode) {
   perror(strerror(errno));
@@ -193,7 +196,10 @@ int main(int argc, char *argv[]) {
   int connectedfd;
 
   char *msg_for_friend = NULL;
+  int msg_for_friend_length = 0;
   char *msg_for_us = NULL;
+  int msg_for_us_length = 0;
+
   int peermode;
 
   nfds = 0;
@@ -290,6 +296,7 @@ int main(int argc, char *argv[]) {
 
       // printf("select returned : %d", selection);
       /* Exceptions with the connected peer */
+      /* ITEM-n Replace with a list of peers ? Or atleast an || condition for other fd */
       if(FD_ISSET(connectedfd, &exceptfds)) {
         myself.stop();
         return 18;
@@ -311,88 +318,107 @@ int main(int argc, char *argv[]) {
           return 0;
         }
 
-        total_bytes += bytes_read;
-        printf("total : %d\n", total_bytes);
-
-        if(logfile == 0)
-          logfile=open("LOG", O_CREAT | O_WRONLY, S_IRWXU);
-        if(logfile == -1)
-          exit(5);
+        total_bytes_in += bytes_read;
+        printf("total_bytes_in : %d\n", total_bytes_in);
 
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
-        if(bytes_read > 1) {
-          dprintf(logfile, "%s", buffer);
-          /* Mask the newline character we get in from stdin */
-          int oldmsgsize = (msg_for_friend == NULL ? 0 : strlen(msg_for_friend));
-          int newmsgsize = oldmsgsize + bytes_read + 1;
-          printf("[GOT STDIN] old : %d, new %d\n", oldmsgsize, newmsgsize);
-          msg_for_friend = (char *) realloc(msg_for_friend, newmsgsize);
-          strncpy(msg_for_friend + oldmsgsize, buffer, bytes_read);
-          msg_for_friend[newmsgsize - 1] = '\0';
-          //          printf("msg for friend: %s\n", msg_for_friend);
+        /* ITEM-n Mask the newline character we get in if it came from stdin ? */
+        msg_for_friend = (char *) realloc(msg_for_friend, msg_for_friend_length + bytes_read);
+        if(msg_for_friend == NULL) {
+          myself.stop();
+          errexit(9);
         }
-      }
+          
+        int i = 0;
+        for(char *d = msg_for_friend + msg_for_friend_length; 
+            i < bytes_read;
+            d++, i++) {
+          *d = *(buffer+i);
+        }
 
+        msg_for_friend_length+=bytes_read;
+        printf("msg_friend_lenth: %d\n", msg_for_friend_length);
+      }
+    
       /* Send a message over TCP */
       if(FD_ISSET(connectedfd, &writefds)) {
         if(msg_for_friend != NULL) {
-          int retval = write(connectedfd, msg_for_friend, strlen(msg_for_friend));
+          int bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
 
-          if(retval == -1) {
+          if(bytes_written_tcp == -1) {
             myself.stop();
             return 11;
           }
-          else if(retval == strlen(msg_for_friend)) {
+
+          total_bytes_tcp_out += bytes_written_tcp;
+          printf("Total bytes tcp out: %d\n", total_bytes_tcp_out);
+
+          if(bytes_written_tcp == msg_for_friend_length) {
             free(msg_for_friend);
             msg_for_friend = NULL;
+            msg_for_friend_length = 0;
           }
-          else
-            msg_for_friend+=retval;
+          else {
+            msg_for_friend += bytes_written_tcp;
+            msg_for_friend_length -= bytes_written_tcp;
+          }
         }
       }
 
       /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
-        int retval = read(connectedfd, buffer, sizeof(buffer) - 1);
+        int bytes_read_tcp = read(connectedfd, buffer, sizeof(buffer) - 1);
 
-        if(retval == -1) {
+        if(bytes_read_tcp == -1) {
           myself.stop();
           return 10;
         }
 
-        if(retval == 0) {
+        total_bytes_tcp_in += bytes_read_tcp;
+        printf("total_bytes_tcp_in: %d\n", total_bytes_tcp_in);
+
+        if(bytes_read_tcp == 0) {
           myself.stop();
           return 0;
         }
 
-        int oldmsgsize = (msg_for_us == NULL ? 0 : strlen(msg_for_us));
-        int newmsgsize = oldmsgsize + retval + 1;
-        printf("[GOT TCP] old : %d, new %d\n", oldmsgsize, newmsgsize);
-        msg_for_us = (char *) realloc(msg_for_us, newmsgsize);
-        strncpy(msg_for_us + oldmsgsize, buffer, retval);
-        msg_for_us[newmsgsize - 1] = '\0';
-        //        printf("msg for us: %s\n", msg_for_us);
+        msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
+        if(msg_for_us == NULL) {
+          myself.stop();
+          errexit(9);
+        }
+
+        int i = 0;
+        for(char *d = msg_for_us + msg_for_us_length; 
+            i < bytes_read_tcp;
+            d++, i++) {
+          *d = *(buffer+i);
+        }
+
+        msg_for_us_length+=bytes_read_tcp;
+        printf("msg_for_us_length: %d\n", msg_for_us_length);
       }
 
       /* Write a message to peer's output fd */
-      if(FD_ISSET(myself.get_fd_out(), &writefds)) {
-        //        printf("READY TO WRITE TO FD!\n");
+      if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
+        int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
 
-        if(msg_for_us != NULL) {
-          //          printf("Writing to FD!\n");
-          int retval = write(myself.get_fd_out(), msg_for_us, strlen(msg_for_us));
+        if(bytes_written == -1) {
+          myself.stop();
+          return 11;
+        }
 
-          if(retval == -1) {
-            myself.stop();
-            return 11;
-          }
-          else if(retval == strlen(msg_for_us)) {
-            free(msg_for_us);
-            msg_for_us = NULL;
-            //            printf("[WRITE FD] msg_for_us is NULL now!\n");
-          }
-          else
-            msg_for_us+=retval;
+        total_bytes_out += bytes_written;
+        printf("total_bytes_out: %d\n", total_bytes_out);
+
+        if(bytes_written == msg_for_us_length) {
+          free(msg_for_us);
+          msg_for_us = NULL;
+          msg_for_us_length = 0;
+        }
+        else {
+          msg_for_us += bytes_written;
+          msg_for_us_length -= bytes_written;
         }
       }
     }
