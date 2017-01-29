@@ -182,6 +182,7 @@ int main(int argc, char *argv[]) {
   int connectedfd;
 
   char *msg_for_friend = NULL;
+  char *msg_for_us = NULL;
   int peermode;
 
   nfds = 0;
@@ -280,9 +281,9 @@ int main(int argc, char *argv[]) {
         return 18;
       }
 
-      /* Got a message over stdin */
+      /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
-        int bytes_read = read(myself.get_fd_in(), buffer, 1024);
+        int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer) - 1);
 
         printf("Bytes read : %d\n", bytes_read);
 
@@ -301,18 +302,20 @@ int main(int argc, char *argv[]) {
           /* Mask the newline character we get in from stdin */
           buffer[bytes_read - 1] = '\0';
 
-          int msgfsize = strlen(buffer) + 1;
-          msg_for_friend = (char *) realloc(msg_for_friend, msgfsize);
-          strcpy(msg_for_friend, buffer);
-          msg_for_friend[msgfsize - 1] = '\0';
-          printf("msg: %s\n", msg_for_friend);
+          int oldmsgsize = (msg_for_friend == NULL ? 0 : strlen(msg_for_friend));
+          int newmsgsize = oldmsgsize + bytes_read + 1;
+          printf("[GOT STDIN] old : %d, new %d\n", oldmsgsize, newmsgsize);
+          msg_for_friend = (char *) realloc(msg_for_friend, newmsgsize);
+          strcpy(msg_for_friend + oldmsgsize, buffer);
+          msg_for_friend[newmsgsize - 1] = '\0';
+          printf("msg for friend: %s\n", msg_for_friend);
         }
       }
 
       /* Send a message over TCP */
       if(FD_ISSET(connectedfd, &writefds)) {
         if(msg_for_friend != NULL) {
-          int retval = send(connectedfd, msg_for_friend, strlen(msg_for_friend), 0);
+          int retval = write(connectedfd, msg_for_friend, strlen(msg_for_friend));
 
           if(retval == -1) {
             myself.stop();
@@ -329,19 +332,43 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
-        int retval = read(connectedfd, buffer, sizeof(buffer));
+        int retval = read(connectedfd, buffer, sizeof(buffer) - 1);
 
         if(retval == -1) {
           myself.stop();
           return 10;
         }
+
         if(retval == 0) {
           myself.stop();
           return 0;
         }
 
-        buffer[retval] = '\0';
-        printf("> %s \n", buffer);
+        int oldmsgsize = (msg_for_us == NULL ? 0 : strlen(msg_for_us));
+        int newmsgsize = oldmsgsize + retval + 1;
+        printf("[GOT TCP] old : %d, new %d\n", oldmsgsize, newmsgsize);
+        msg_for_us = (char *) realloc(msg_for_us, newmsgsize);
+        strcpy(msg_for_us + oldmsgsize, buffer);
+        msg_for_us[newmsgsize - 1] = '\0';
+        printf("msg for us: %s\n", msg_for_us);
+      }
+
+      /* Write a message to peer's output fd */
+      if(FD_ISSET(myself.get_fd_out(), &writefds)) {
+        if(msg_for_us != NULL) {
+          int retval = write(myself.get_fd_out(), msg_for_us, strlen(msg_for_us));
+
+          if(retval == -1) {
+            myself.stop();
+            return 11;
+          }
+          else if(retval == strlen(msg_for_us)) {
+            free(msg_for_us);
+            msg_for_us = NULL;
+          }
+          else
+            msg_for_us+=retval;
+        }
       }
     }
   }
