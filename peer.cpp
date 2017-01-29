@@ -247,7 +247,9 @@ int main(int argc, char *argv[]) {
   }
 
   printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
-  int logfile = 0;
+
+  bool stdin_read_ok = true;
+  bool tcp_read_ok = true;
 
   /* Main conversation */
   while(1) {
@@ -256,8 +258,11 @@ int main(int argc, char *argv[]) {
     FD_ZERO(&writefds);
     FD_ZERO(&exceptfds);
 
-    FD_SET(myself.get_fd_in(), &readfds);
-    FD_SET(connectedfd, &readfds);
+    if(stdin_read_ok)
+      FD_SET(myself.get_fd_in(), &readfds);
+
+    if(tcp_read_ok)
+      FD_SET(connectedfd, &readfds);
 
     if(msg_for_friend_length > 0)
       FD_SET(connectedfd, &writefds);
@@ -303,9 +308,8 @@ int main(int argc, char *argv[]) {
         }
 
         if(bytes_read == 0) {
-          myself.stop();
-          close(logfile);
-          return 0;
+          stdin_read_ok = false;
+          continue;
         }
 
         total_bytes_in += bytes_read;
@@ -389,8 +393,8 @@ int main(int argc, char *argv[]) {
         printf("total_bytes_tcp_in: %d\n", total_bytes_tcp_in);
 
         if(bytes_read_tcp == 0) {
-          myself.stop();
-          return 0;
+          tcp_read_ok = false;
+          continue;
         }
 
         msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
