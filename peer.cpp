@@ -10,11 +10,15 @@
 #include <errno.h>
 #include <string.h>
 #include <signal.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #define CONNECT_TO_FRIEND 999
 #define WAIT_FOR_FRIEND   998
+#define IN_FILE "/tmp/peerin"
+#define OUT_FILE "/tmp/peerout"
 
-void handle_err(int lastcode) {
+void errexit(int lastcode) {
   perror(strerror(errno));
   exit(lastcode);
 }
@@ -30,22 +34,49 @@ class peer {
   socklen_t peersock_addr_size;
   int fd_this_side;
   int fd_other_side;
+  std::string file_input;
+  std::string file_output;
+  int fd_input_file;
+  int fd_output_file;
 
 public:
-
   peer() {
     fd_this_side = -1;
     fd_other_side = -1;
+
+    /* STDIN and STDOUT by default */
+    fd_input_file = 0;
+    fd_output_file = 1;
+
     mode = 0;
   }
 
-  int set_up(int mode_to_set, char *IP, int port) {
+  int get_fd_in(void) {
+    return fd_input_file;
+  }
+
+  int get_fd_out(void) {
+    return fd_output_file;
+  }
+
+  int set_up(int mode_to_set, char *IP, int port, char *infile, char *outfile) {
+
+    printf("[SETUP] MODE : %s\n", mode_to_set == WAIT_FOR_FRIEND ? "WAIT_FOR_FRIEND" :
+           mode_to_set == CONNECT_TO_FRIEND ? "CONNECT_TO_FRIEND" : "UNKNOWN");
+    printf("[SETUP] IP:Port : %s:%d\n", IP, port);
+    printf("[SETUP] input file : %s\n", infile == NULL ? "stdin" : infile);
+    printf("[SETUP] output file : %s\n", outfile == NULL ? "stdout" : outfile);
 
     mode = mode_to_set;
 
+    if(infile != NULL)
+      file_input = std::string(infile);
+
+    if(outfile != NULL)
+      file_output = std::string(outfile);
+
     fd_this_side = socket(AF_INET, SOCK_STREAM, 0);
     if(fd_this_side == -1)
-      /* handle_err here is not really C++ */
       return -1;
 
     memset(&peersock_addr, 0, sizeof(struct sockaddr_in));
@@ -62,10 +93,27 @@ public:
         stop();
         return -3;
       }
-      printf("Will LISTEN for connections on %s:%d\n\n", IP, port);
     }
     else if(mode == CONNECT_TO_FRIEND) {
-      printf("Will CONNECT to %s:%d\n\n", IP, port);
+      ;
+    }
+
+    /* in_file  */
+    if(file_input.length() > 0) {
+      fd_input_file = open(file_input.c_str(), O_RDONLY);
+      if(fd_input_file == -1) {
+        stop();
+        return -4;
+      }
+    }
+
+    /* out_file */ 
+    if(file_output.length() > 0) {
+      fd_output_file = open(file_output.c_str(), O_WRONLY);
+      if(fd_output_file == -1) {
+        stop();
+        return -5;
+      }
     }
 
     return 0;
@@ -96,6 +144,7 @@ public:
         stop();
         return -1;
       }
+
       return fd_this_side;
     }
 
@@ -126,31 +175,57 @@ int main(int argc, char *argv[]) {
   fd_set writefds;
   fd_set exceptfds;
 
-  int retval, stdinfd, nfds;
+  int retval, nfds;
   int connectedfd;
 
   char *msg_for_friend = NULL;
   int peermode;
 
-  stdinfd = nfds = 0;
+  nfds = 0;
 
-  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT\n\tOR\n\t%s -friend friendIP friendPort\n", argv[0], argv[0]);
+  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] \n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [ -outfile]\n", argv[0], argv[0]);
 
   /* Handle command line arguments for flexibility */
-  if(argc!=4) {
+  if(argc < 4 || argc > 5) {
     printf("%s", USAGE);
     return 1;
   }
 
   if(!strcmp(argv[1], "-listen")) {
+    printf("Set peermode to WAIT\n");
     peermode = WAIT_FOR_FRIEND;
   }
   else if(!strcmp(argv[1], "-friend")) {
+    printf("Set peermode to CONNECT\n");
     peermode = CONNECT_TO_FRIEND;
   }
   else {
     printf("%s", USAGE);
-    return 2;
+    errexit(2);
+  }
+
+  peer myself;
+  if(argc > 4) {
+    if(!strcmp(argv[4], "-infile")) {
+      if (myself.set_up(peermode, argv[2], atoi(argv[3]), IN_FILE, NULL) < 0)
+        errexit(-2);
+    }
+    else if(!strcmp(argv[4], "-outfile")) {
+      if (myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, OUT_FILE) < 0)
+        errexit(-2);
+    }
+    else if(!strcmp(argv[4], "-inoutfile")) {
+      if (myself.set_up(peermode, argv[2], atoi(argv[3]), IN_FILE, OUT_FILE) < 0)
+        errexit(-2);
+    }
+    else {
+      printf("%s", USAGE);
+      errexit(1);
+    }
+  }
+  else {
+    if(myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, NULL) < 0)
+      errexit(-1);
   }
 
   /*
@@ -163,13 +238,9 @@ int main(int argc, char *argv[]) {
      // return 5;
   */
 
-  peer myself;
-  if (myself.set_up(peermode, argv[2], atoi(argv[3])) < 0)
-    return -1;
-
   connectedfd = myself.start();
   if(connectedfd < 0) {
-    return -2;
+    errexit(-2);
   }
 
   printf("Connection established with connectedfd = %d.\n", connectedfd);
@@ -181,8 +252,9 @@ int main(int argc, char *argv[]) {
     FD_ZERO(&writefds);
     FD_ZERO(&exceptfds);
 
-    FD_SET(stdinfd, &readfds);
+    FD_SET(myself.get_fd_in(), &readfds);
     FD_SET(connectedfd, &readfds);
+    /* ITEM-3 : Only add connectedfd to write fdset if we have data waiting to be written */
     FD_SET(connectedfd, &writefds);
     FD_SET(connectedfd, &exceptfds);
     nfds = connectedfd + 1;
@@ -192,11 +264,10 @@ int main(int argc, char *argv[]) {
 
     if(selection == -1) {
       myself.stop();
-      handle_err(7);
+      errexit(7);
     }
     else if(selection) {
 
-      printf(" ===> Number of descriptors from select(): %d\n", selection);
       /* Exceptions with the connected peer */
       if(FD_ISSET(connectedfd, &exceptfds)) {
         myself.stop();
@@ -204,8 +275,7 @@ int main(int argc, char *argv[]) {
       }
 
       /* Got a message over stdin */
-      if(FD_ISSET(stdinfd, &readfds)) {
-        printf(" ===> stdin ready for reading!\n");
+      if(FD_ISSET(myself.get_fd_in(), &readfds)) {
         int bytes_read = read(0, buffer, 1024);
 
         if(bytes_read < 0) {
