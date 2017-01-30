@@ -19,6 +19,7 @@
 #define IN_FILE "/tmp/peerin"
 #define OUT_FILE "/tmp/peerout"
 
+int total_bytes = 0;
 
 void errexit(int lastcode) {
   perror(strerror(errno));
@@ -109,7 +110,7 @@ public:
       }
     }
 
-    /* out_file */ 
+    /* out_file */
     if(file_output.length() > 0) {
       fd_output_file = open(file_output.c_str(), O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG);
       if(fd_output_file == -1) {
@@ -126,7 +127,7 @@ public:
 
   int start(void) {
 
-    printf("Starting up peer with mode = %d\n", mode);
+    printf("[START] Starting up peer with mode = %d\n", mode);
     peersock_addr_size = sizeof(struct sockaddr_in);
 
     /* There are only 2 modes */
@@ -158,8 +159,6 @@ public:
 
   void stop(void) {
 
-    printf("Inside stop\n");
-
     if(fd_this_side > 0)
       close(fd_this_side);
 
@@ -184,6 +183,7 @@ int main(int argc, char *argv[]) {
 
   char USAGE[200];
   char buffer[1025];
+  buffer[1024] = '\0';
 
   fd_set readfds;
   fd_set writefds;
@@ -256,7 +256,8 @@ int main(int argc, char *argv[]) {
     errexit(-2);
   }
 
-  printf("Connection established with connectedfd = %d.\n", connectedfd);
+  printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
+  int logfile = 0;
 
   /* Main conversation */
   while(1) {
@@ -288,7 +289,6 @@ int main(int argc, char *argv[]) {
     else if(selection) {
 
       // printf("select returned : %d", selection);
-
       /* Exceptions with the connected peer */
       if(FD_ISSET(connectedfd, &exceptfds)) {
         myself.stop();
@@ -298,8 +298,7 @@ int main(int argc, char *argv[]) {
       /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
         int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer) - 1);
-
-        printf("Bytes read : %d\n", bytes_read);
+        printf("[STDIN] Bytes read : %d\n", bytes_read);
 
         if(bytes_read < 0) {
           myself.stop();
@@ -308,11 +307,21 @@ int main(int argc, char *argv[]) {
 
         if(bytes_read == 0) {
           myself.stop();
+          close(logfile);
           return 0;
         }
 
+        total_bytes += bytes_read;
+        printf("total : %d\n", total_bytes);
+
+        if(logfile == 0)
+          logfile=open("LOG", O_CREAT | O_WRONLY, S_IRWXU);
+        if(logfile == -1)
+          exit(5);
+
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
         if(bytes_read > 1) {
+          dprintf(logfile, "%s", buffer);
           /* Mask the newline character we get in from stdin */
           int oldmsgsize = (msg_for_friend == NULL ? 0 : strlen(msg_for_friend));
           int newmsgsize = oldmsgsize + bytes_read + 1;
@@ -320,7 +329,7 @@ int main(int argc, char *argv[]) {
           msg_for_friend = (char *) realloc(msg_for_friend, newmsgsize);
           strncpy(msg_for_friend + oldmsgsize, buffer, bytes_read);
           msg_for_friend[newmsgsize - 1] = '\0';
-          printf("msg for friend: %s\n", msg_for_friend);
+          //          printf("msg for friend: %s\n", msg_for_friend);
         }
       }
 
@@ -362,15 +371,15 @@ int main(int argc, char *argv[]) {
         msg_for_us = (char *) realloc(msg_for_us, newmsgsize);
         strncpy(msg_for_us + oldmsgsize, buffer, retval);
         msg_for_us[newmsgsize - 1] = '\0';
-        printf("msg for us: %s\n", msg_for_us);
+        //        printf("msg for us: %s\n", msg_for_us);
       }
 
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds)) {
-        printf("READY TO WRITE TO FD!\n");
+        //        printf("READY TO WRITE TO FD!\n");
 
         if(msg_for_us != NULL) {
-          printf("Writing to FD!\n");
+          //          printf("Writing to FD!\n");
           int retval = write(myself.get_fd_out(), msg_for_us, strlen(msg_for_us));
 
           if(retval == -1) {
@@ -380,7 +389,7 @@ int main(int argc, char *argv[]) {
           else if(retval == strlen(msg_for_us)) {
             free(msg_for_us);
             msg_for_us = NULL;
-            printf("[WRITE FD] msg_for_us is NULL now!\n");
+            //            printf("[WRITE FD] msg_for_us is NULL now!\n");
           }
           else
             msg_for_us+=retval;
