@@ -12,11 +12,13 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <algorithm>
 
 #define CONNECT_TO_FRIEND 999
 #define WAIT_FOR_FRIEND   998
 #define IN_FILE "/tmp/peerin"
 #define OUT_FILE "/tmp/peerout"
+
 
 void errexit(int lastcode) {
   perror(strerror(errno));
@@ -155,6 +157,9 @@ public:
   }
 
   void stop(void) {
+
+    printf("Inside stop\n");
+
     if(fd_this_side > 0)
       close(fd_this_side);
 
@@ -264,11 +269,14 @@ int main(int argc, char *argv[]) {
     FD_SET(connectedfd, &readfds);
     /* ITEM-3 : Only add connectedfd to write fdset if we have data waiting to be written */
     FD_SET(connectedfd, &writefds);
-    FD_SET(myself.get_fd_out(), &writefds);
     FD_SET(connectedfd, &exceptfds);
+    FD_SET(myself.get_fd_out(), &writefds);
     FD_SET(myself.get_fd_in(), &exceptfds);
+    FD_SET(myself.get_fd_out(), &exceptfds);
 
-    nfds = (connectedfd > myself.get_fd_in() ? connectedfd : myself.get_fd_in()) + 1;
+    nfds = std::max(connectedfd, myself.get_fd_in());
+    nfds = std::max(nfds, myself.get_fd_out());
+    nfds = nfds + 1;
 
     /* Wait for data to arrive on the socket or stdin or a new connection */
     int selection = select(nfds, &readfds, &writefds, &exceptfds, NULL);
@@ -359,7 +367,10 @@ int main(int argc, char *argv[]) {
 
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds)) {
+        printf("READY TO WRITE TO FD!\n");
+
         if(msg_for_us != NULL) {
+          printf("Writing to FD!\n");
           int retval = write(myself.get_fd_out(), msg_for_us, strlen(msg_for_us));
 
           if(retval == -1) {
@@ -369,6 +380,7 @@ int main(int argc, char *argv[]) {
           else if(retval == strlen(msg_for_us)) {
             free(msg_for_us);
             msg_for_us = NULL;
+            printf("[WRITE FD] msg_for_us is NULL now!\n");
           }
           else
             msg_for_us+=retval;
