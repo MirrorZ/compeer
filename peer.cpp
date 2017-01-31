@@ -68,7 +68,7 @@ public:
   int set_up(int mode_to_set, char *IP, int port, char *infile, char *outfile) {
 
     printf("[SETUP] MODE : %s\n", mode_to_set == WAIT_FOR_FRIEND ? "WAIT_FOR_FRIEND" :
-           mode_to_set == CONNECT_TO_FRIEND ? "CONNECT_TO_FRIEND" : "UNKNOWN");
+    mode_to_set == CONNECT_TO_FRIEND ? "CONNECT_TO_FRIEND" : "UNKNOWN");
     printf("[SETUP] IP:Port : %s:%d\n", IP, port);
     printf("[SETUP] input file : %s\n", infile == NULL ? "stdin" : infile);
     printf("[SETUP] output file : %s\n", outfile == NULL ? "stdout" : outfile);
@@ -108,6 +108,7 @@ public:
     if(file_input.length() > 0) {
       fd_input_file = open(file_input.c_str(), O_RDONLY);
       if(fd_input_file == -1) {
+	printf("%s does not exist", file_input.c_str());
         stop();
         return -4;
       }
@@ -122,8 +123,8 @@ public:
       }
     }
 
-    printf("[SETUP] input file descriptor : %d\n", fd_input_file);
-    printf("[SETUP] output file descriptor : %d\n", fd_output_file);
+    //printf("[SETUP] input file descriptor : %d\n", fd_input_file);
+    //printf("[SETUP] output file descriptor : %d\n", fd_output_file);
 
     return 0;
   }
@@ -181,6 +182,7 @@ int main(int argc, char *argv[]) {
   char USAGE[200];
   char buffer[1025];
   buffer[1024] = '\0';
+  char infile[1024], outfile[1024];
 
   fd_set readfds;
   fd_set writefds;
@@ -198,10 +200,11 @@ int main(int argc, char *argv[]) {
 
   nfds = 0;
 
-  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [ -outfile] [ -inoutfile ]\n", argv[0], argv[0]);
+  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ]\n", argv[0], argv[0]);
+  //sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile [infile] ] [ -outfile [outfile] ] [ -inoutfile ]\n", argv[0], argv[0]);
 
   /* Handle command line arguments for flexibility */
-  if(argc < 4 || argc > 5) {
+  if(argc < 4 || argc > 6) {
     printf("%s", USAGE);
     return 1;
   }
@@ -220,11 +223,19 @@ int main(int argc, char *argv[]) {
   peer myself;
   if(argc > 4) {
     if(!strcmp(argv[4], "-infile")) {
-      if (myself.set_up(peermode, argv[2], atoi(argv[3]), IN_FILE, NULL) < 0)
+      if(argc > 5)
+        strcpy(infile, argv[5]);
+      else
+	strcpy(infile, IN_FILE);
+      if (myself.set_up(peermode, argv[2], atoi(argv[3]), infile, NULL) < 0)
         errexit(-2);
     }
     else if(!strcmp(argv[4], "-outfile")) {
-      if (myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, OUT_FILE) < 0)
+      if(argc > 5)
+        strcpy(outfile, argv[5]);
+      else
+	strcpy(outfile, OUT_FILE);
+      if (myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, outfile) < 0)
         errexit(-2);
     }
     else if(!strcmp(argv[4], "-inoutfile")) {
@@ -246,9 +257,11 @@ int main(int argc, char *argv[]) {
     errexit(-2);
   }
 
+  int logfile = 0;
+
   printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
 
-  bool stdin_read_ok = true;
+  bool fdin_read_ok = true;
   bool tcp_read_ok = true;
 
   /* Main conversation */
@@ -258,7 +271,13 @@ int main(int argc, char *argv[]) {
     FD_ZERO(&writefds);
     FD_ZERO(&exceptfds);
 
-    if(stdin_read_ok)
+    /* If nothing to send or receive, tear down and break */
+    if((!fdin_read_ok && msg_for_friend_length<=0) || (!tcp_read_ok && msg_for_us_length<=0)) {
+      myself.stop();
+      break;
+    }
+
+    if(fdin_read_ok)
       FD_SET(myself.get_fd_in(), &readfds);
 
     if(tcp_read_ok)
@@ -299,8 +318,10 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
+	printf("\nInput fd set\n");
         int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer) - 1);
-        printf("Bytes read stdin: %d\n", bytes_read);
+
+        printf("Bytes read in: %d\n", bytes_read);
 
         if(bytes_read < 0) {
           myself.stop();
@@ -308,12 +329,12 @@ int main(int argc, char *argv[]) {
         }
 
         if(bytes_read == 0) {
-          stdin_read_ok = false;
+          fdin_read_ok = false;
           continue;
         }
 
         total_bytes_in += bytes_read;
-        printf("total_bytes_in : %d\n", total_bytes_in);
+        //printf("total_bytes_in : %d\n", total_bytes_in);
 
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
         /* ITEM-n Mask the newline character we get in if it came from stdin ? */
@@ -331,11 +352,12 @@ int main(int argc, char *argv[]) {
         }
 
         msg_for_friend_length+=bytes_read;
-        printf("msg_for_friend_length: %d\n", msg_for_friend_length);
+        //printf("msg_for_friend_length: %d\n", msg_for_friend_length);
       }
 
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
+	printf("\nWriting to output fd\n");
         int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
 
         if(bytes_written == -1) {
@@ -359,6 +381,7 @@ int main(int argc, char *argv[]) {
 
       /* Send a message over TCP */
       if(FD_ISSET(connectedfd, &writefds) && msg_for_friend_length > 0) {
+	printf("\nSending message over TCP\n");
         int bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
 
         if(bytes_written_tcp == -1) {
@@ -367,7 +390,7 @@ int main(int argc, char *argv[]) {
         }
 
         total_bytes_tcp_out += bytes_written_tcp;
-        printf("total_bytes_tcp_out: %d\n", total_bytes_tcp_out);
+        printf("total_bytes_tcp_sent: %d\n", total_bytes_tcp_out);
 
         if(bytes_written_tcp == msg_for_friend_length) {
           free(msg_for_friend);
@@ -382,6 +405,7 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
+	printf("\nReceived message\n");
         int bytes_read_tcp = read(connectedfd, buffer, sizeof(buffer) - 1);
 
         if(bytes_read_tcp == -1) {
@@ -390,7 +414,7 @@ int main(int argc, char *argv[]) {
         }
 
         total_bytes_tcp_in += bytes_read_tcp;
-        printf("total_bytes_tcp_in: %d\n", total_bytes_tcp_in);
+        printf("total_bytes_tcp_received: %d\n", total_bytes_tcp_in);
 
         if(bytes_read_tcp == 0) {
           tcp_read_ok = false;
@@ -411,15 +435,10 @@ int main(int argc, char *argv[]) {
         }
 
         msg_for_us_length+=bytes_read_tcp;
-        printf("msg_for_us_length: %d\n", msg_for_us_length);
+        //printf("msg_for_us_length: %d\n", msg_for_us_length);
       }
     }
   }
-
-  FD_ZERO(&readfds);
-  FD_ZERO(&writefds);
-  FD_ZERO(&exceptfds);
-  myself.stop();
 
   return 0;
 }
