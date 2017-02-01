@@ -1,4 +1,3 @@
-#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -13,13 +12,17 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <algorithm>
+#include <iostream>
 
 #define CONNECT_TO_FRIEND 999
 #define WAIT_FOR_FRIEND   998
 #define IN_FILE "/tmp/peerin"
 #define OUT_FILE "/tmp/peerout"
 
-int total_bytes = 0;
+int total_bytes_in = 0;
+int total_bytes_tcp_in = 0;
+int total_bytes_out = 0;
+int total_bytes_tcp_out = 0;
 
 void errexit(int lastcode) {
   perror(strerror(errno));
@@ -65,7 +68,7 @@ public:
   int set_up(int mode_to_set, char *IP, int port, char *infile, char *outfile) {
 
     printf("[SETUP] MODE : %s\n", mode_to_set == WAIT_FOR_FRIEND ? "WAIT_FOR_FRIEND" :
-           mode_to_set == CONNECT_TO_FRIEND ? "CONNECT_TO_FRIEND" : "UNKNOWN");
+    mode_to_set == CONNECT_TO_FRIEND ? "CONNECT_TO_FRIEND" : "UNKNOWN");
     printf("[SETUP] IP:Port : %s:%d\n", IP, port);
     //    printf("[SETUP] input file : %s\n", infile == NULL ? "stdin" : infile);
     //    printf("[SETUP] output file : %s\n", outfile == NULL ? "stdout" : outfile);
@@ -105,6 +108,7 @@ public:
     if(file_input.length() > 0) {
       fd_input_file = open(file_input.c_str(), O_RDONLY);
       if(fd_input_file == -1) {
+	printf("%s does not exist", file_input.c_str());
         stop();
         return -4;
       }
@@ -173,17 +177,12 @@ public:
   }
 };
 
-/* ITEM-1 : Uncomment this block if really required. Kept around if needed later.
-void SIGINT_handler(int signum) {
-  Close all TCP connections?
-}
-*/
-
 int main(int argc, char *argv[]) {
 
   char USAGE[200];
   char buffer[1025];
   buffer[1024] = '\0';
+  char infile[1024], outfile[1024];
 
   fd_set readfds;
   fd_set writefds;
@@ -193,16 +192,19 @@ int main(int argc, char *argv[]) {
   int connectedfd;
 
   char *msg_for_friend = NULL;
+  int msg_for_friend_length = 0;
   char *msg_for_us = NULL;
+  int msg_for_us_length = 0;
+
   int peermode;
 
   nfds = 0;
 
   sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ]\n", argv[0], argv[0]);
-  //sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [ -outfile] [ -inoutfile ]\n", argv[0], argv[0]);
+  //sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile [infile] ] [ -outfile [outfile] ] [ -inoutfile ]\n", argv[0], argv[0]);
 
   /* Handle command line arguments for flexibility */
-  if(argc != 4) {
+  if(argc < 4 || argc > 6) {
     printf("%s", USAGE);
     return 1;
   }
@@ -221,11 +223,19 @@ int main(int argc, char *argv[]) {
   peer myself;
   if(argc > 4) {
     if(!strcmp(argv[4], "-infile")) {
-      if (myself.set_up(peermode, argv[2], atoi(argv[3]), IN_FILE, NULL) < 0)
+      if(argc > 5)
+        strcpy(infile, argv[5]);
+      else
+	strcpy(infile, IN_FILE);
+      if (myself.set_up(peermode, argv[2], atoi(argv[3]), infile, NULL) < 0)
         errexit(-2);
     }
     else if(!strcmp(argv[4], "-outfile")) {
-      if (myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, OUT_FILE) < 0)
+      if(argc > 5)
+        strcpy(outfile, argv[5]);
+      else
+	strcpy(outfile, OUT_FILE);
+      if (myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, outfile) < 0)
         errexit(-2);
     }
     else if(!strcmp(argv[4], "-inoutfile")) {
@@ -242,23 +252,17 @@ int main(int argc, char *argv[]) {
       errexit(-1);
   }
 
-  /*
-     ITEM-1 : Uncomment this block if really required. Kept around if needed later.
-     // Set up a SIGINT catch
-     // struct sigaction SIGINT_ACTION;
-     // memset(&SIGINT_ACTION, 0, sizeof(struct sigaction));
-     // SIGINT_ACTION.sa_handler = SIGINT_handler;
-     // if(sigaction(SIGINT, &SIGINT_ACTION, NULL) == -1)
-     // return 5;
-  */
-
   connectedfd = myself.start();
   if(connectedfd < 0) {
     errexit(-2);
   }
 
-  // printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
   int logfile = 0;
+
+  printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
+
+  bool fdin_read_ok = true;
+  bool tcp_read_ok = true;
 
   /* Main conversation */
   while(1) {
@@ -267,12 +271,25 @@ int main(int argc, char *argv[]) {
     FD_ZERO(&writefds);
     FD_ZERO(&exceptfds);
 
-    FD_SET(myself.get_fd_in(), &readfds);
-    FD_SET(connectedfd, &readfds);
-    /* ITEM-3 : Only add connectedfd to write fdset if we have data waiting to be written */
-    FD_SET(connectedfd, &writefds);
+    /* If nothing to send or receive, tear down and break */
+    if((!fdin_read_ok && msg_for_friend_length<=0) || (!tcp_read_ok && msg_for_us_length<=0)) {
+      myself.stop();
+      break;
+    }
+
+    if(fdin_read_ok)
+      FD_SET(myself.get_fd_in(), &readfds);
+
+    if(tcp_read_ok)
+      FD_SET(connectedfd, &readfds);
+
+    if(msg_for_friend_length > 0)
+      FD_SET(connectedfd, &writefds);
+
+    if(msg_for_us_length > 0)
+      FD_SET(myself.get_fd_out(), &writefds);
+
     FD_SET(connectedfd, &exceptfds);
-    FD_SET(myself.get_fd_out(), &writefds);
     FD_SET(myself.get_fd_in(), &exceptfds);
     FD_SET(myself.get_fd_out(), &exceptfds);
 
@@ -289,17 +306,21 @@ int main(int argc, char *argv[]) {
     }
     else if(selection) {
 
-      // printf("select returned : %d", selection);
       /* Exceptions with the connected peer */
-      if(FD_ISSET(connectedfd, &exceptfds)) {
+      /* ITEM-n Replace with a list of peers ? Or atleast an || condition for other fd */
+      if(FD_ISSET(connectedfd, &exceptfds) ||
+         FD_ISSET(myself.get_fd_in(), &exceptfds) ||
+         FD_ISSET(myself.get_fd_out(), &exceptfds)) {
+
         myself.stop();
         return 18;
       }
 
       /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
+	printf("\nInput fd set\n");
         int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer) - 1);
-        // printf("[STDIN] Bytes read : %d\n", bytes_read);
+        printf("Bytes read in: %d\n", bytes_read);
 
         if(bytes_read < 0) {
           myself.stop();
@@ -307,102 +328,116 @@ int main(int argc, char *argv[]) {
         }
 
         if(bytes_read == 0) {
-          myself.stop();
-          close(logfile);
-          return 0;
+          fdin_read_ok = false;
+          continue;
         }
 
-        total_bytes += bytes_read;
-        // printf("total : %d\n", total_bytes);
-
-        if(logfile == 0)
-          logfile=open("LOG", O_CREAT | O_WRONLY, S_IRWXU);
-        if(logfile == -1)
-          exit(5);
+        total_bytes_in += bytes_read;
+        //printf("total_bytes_in : %d\n", total_bytes_in);
 
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
-        if(bytes_read > 1) {
-          // dprintf(logfile, "%s", buffer);
-          /* Mask the newline character we get in from stdin */
-          int oldmsgsize = (msg_for_friend == NULL ? 0 : strlen(msg_for_friend));
-          int newmsgsize = oldmsgsize + bytes_read + 1;
-          // printf("[GOT STDIN] old : %d, new %d\n", oldmsgsize, newmsgsize);
-          msg_for_friend = (char *) realloc(msg_for_friend, newmsgsize);
-          strncpy(msg_for_friend + oldmsgsize, buffer, bytes_read);
-          msg_for_friend[newmsgsize - 1] = '\0';
-          //          printf("msg for friend: %s\n", msg_for_friend);
+        /* ITEM-n Mask the newline character we get in if it came from stdin ? */
+        msg_for_friend = (char *) realloc(msg_for_friend, msg_for_friend_length + bytes_read);
+        if(msg_for_friend == NULL) {
+          myself.stop();
+          errexit(9);
+        }
+
+        int i = 0;
+        for(char *d = msg_for_friend + msg_for_friend_length;
+            i < bytes_read;
+            d++, i++) {
+          *d = *(buffer+i);
+        }
+
+        msg_for_friend_length+=bytes_read;
+        //printf("msg_for_friend_length: %d\n", msg_for_friend_length);
+      }
+
+      /* Write a message to peer's output fd */
+      if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
+	printf("\nWriting to output fd\n");
+        int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
+
+        if(bytes_written == -1) {
+          myself.stop();
+          return 11;
+        }
+
+        total_bytes_out += bytes_written;
+        printf("total_bytes_out: %d\n", total_bytes_out);
+
+        if(bytes_written == msg_for_us_length) {
+          free(msg_for_us);
+          msg_for_us = NULL;
+          msg_for_us_length = 0;
+        }
+        else {
+          msg_for_us += bytes_written;
+          msg_for_us_length -= bytes_written;
         }
       }
 
       /* Send a message over TCP */
-      if(FD_ISSET(connectedfd, &writefds)) {
-        if(msg_for_friend != NULL) {
-          int retval = write(connectedfd, msg_for_friend, strlen(msg_for_friend));
+      if(FD_ISSET(connectedfd, &writefds) && msg_for_friend_length > 0) {
+	printf("\nSending message over TCP\n");
+        int bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
 
-          if(retval == -1) {
-            myself.stop();
-            return 11;
-          }
-          else if(retval == strlen(msg_for_friend)) {
-            free(msg_for_friend);
-            msg_for_friend = NULL;
-          }
-          else
-            msg_for_friend+=retval;
+        if(bytes_written_tcp == -1) {
+          myself.stop();
+          return 11;
+        }
+
+        total_bytes_tcp_out += bytes_written_tcp;
+        printf("total_bytes_tcp_sent: %d\n", total_bytes_tcp_out);
+
+        if(bytes_written_tcp == msg_for_friend_length) {
+          free(msg_for_friend);
+          msg_for_friend = NULL;
+          msg_for_friend_length = 0;
+        }
+        else {
+          msg_for_friend += bytes_written_tcp;
+          msg_for_friend_length -= bytes_written_tcp;
         }
       }
 
       /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
-        int retval = read(connectedfd, buffer, sizeof(buffer) - 1);
+	printf("\nReceived message\n");
+        int bytes_read_tcp = read(connectedfd, buffer, sizeof(buffer) - 1);
 
-        if(retval == -1) {
+        if(bytes_read_tcp == -1) {
           myself.stop();
           return 10;
         }
 
-        if(retval == 0) {
+        total_bytes_tcp_in += bytes_read_tcp;
+        printf("total_bytes_tcp_received: %d\n", total_bytes_tcp_in);
+
+        if(bytes_read_tcp == 0) {
+          tcp_read_ok = false;
+          continue;
+        }
+
+        msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
+        if(msg_for_us == NULL) {
           myself.stop();
-          return 0;
+          errexit(9);
         }
 
-        int oldmsgsize = (msg_for_us == NULL ? 0 : strlen(msg_for_us));
-        int newmsgsize = oldmsgsize + retval + 1;
-        // printf("[GOT TCP] old : %d, new %d\n", oldmsgsize, newmsgsize);
-        msg_for_us = (char *) realloc(msg_for_us, newmsgsize);
-        strncpy(msg_for_us + oldmsgsize, buffer, retval);
-        msg_for_us[newmsgsize - 1] = '\0';
-        //        printf("msg for us: %s\n", msg_for_us);
-      }
-
-      /* Write a message to peer's output fd */
-      if(FD_ISSET(myself.get_fd_out(), &writefds)) {
-        //        printf("READY TO WRITE TO FD!\n");
-
-        if(msg_for_us != NULL) {
-          //          printf("Writing to FD!\n");
-          int retval = write(myself.get_fd_out(), msg_for_us, strlen(msg_for_us));
-
-          if(retval == -1) {
-            myself.stop();
-            return 11;
-          }
-          else if(retval == strlen(msg_for_us)) {
-            free(msg_for_us);
-            msg_for_us = NULL;
-            //            printf("[WRITE FD] msg_for_us is NULL now!\n");
-          }
-          else
-            msg_for_us+=retval;
+        int i = 0;
+        for(char *d = msg_for_us + msg_for_us_length;
+            i < bytes_read_tcp;
+            d++, i++) {
+          *d = *(buffer+i);
         }
+
+        msg_for_us_length+=bytes_read_tcp;
+        //printf("msg_for_us_length: %d\n", msg_for_us_length);
       }
     }
   }
-
-  FD_ZERO(&readfds);
-  FD_ZERO(&writefds);
-  FD_ZERO(&exceptfds);
-  myself.stop();
 
   return 0;
 }

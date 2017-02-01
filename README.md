@@ -2,22 +2,20 @@
 
 Decentralised peer to peer messenger
 
-
 ### TODO
 
 ~~Handle multiple messages correctly~~
-* Handle disconnection;
+~~Handle disconnection~~
 * Add Signal Handlers 
 * Enable Encryption
-* Handle SIGINT
+
 
 ### Suggestions/Issues
 
-Feel free to add issues, submit patches
-
+Feel free to add issues, submit patches.
 Ideas are welcome!
 
-Contact 
+Contact:
 
 chandrika3437@gmail.com
 
