@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <pwd.h>
 #include <errno.h>
 #include <string.h>
 #include <signal.h>
@@ -13,6 +14,7 @@
 #include <fcntl.h>
 #include <algorithm>
 #include <iostream>
+#include "crypto.h"
 
 #define CONNECT_TO_FRIEND 999
 #define WAIT_FOR_FRIEND   998
@@ -180,9 +182,10 @@ public:
 int main(int argc, char *argv[]) {
 
   char USAGE[200];
-  char buffer[1025];
-  buffer[1024] = '\0';
-  char infile[1024], outfile[1024];
+  char buffer[256];
+  buffer[256] = '\0';
+  char infile[256], outfile[256];
+  bool encrypt = false;
 
   fd_set readfds;
   fd_set writefds;
@@ -195,16 +198,20 @@ int main(int argc, char *argv[]) {
   int msg_for_friend_length = 0;
   char *msg_for_us = NULL;
   int msg_for_us_length = 0;
+  char *encrypted_msg_for_us = NULL;
+  int encrypted_msg_for_us_length = 0;
+  int total_encrypted_msg_for_us_length = 0;
 
   int peermode;
+  Crypto c;
 
   nfds = 0;
 
-  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ]\n", argv[0], argv[0]);
+  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ][-encrypt]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [-encrypt]\n", argv[0], argv[0]);
   //sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile [infile] ] [ -outfile [outfile] ] [ -inoutfile ]\n", argv[0], argv[0]);
 
   /* Handle command line arguments for flexibility */
-  if(argc < 4 || argc > 6) {
+  if(argc < 4 || argc > 7) {
     printf("%s", USAGE);
     return 1;
   }
@@ -223,16 +230,26 @@ int main(int argc, char *argv[]) {
   peer myself;
   if(argc > 4) {
     if(!strcmp(argv[4], "-infile")) {
-      if(argc > 5)
+      if(argc > 5) {
         strcpy(infile, argv[5]);
+	if (argc > 6) {
+	  if(!strcmp(argv[6], "-encrypt"));
+             encrypt = true;
+        }
+      }
       else
 	strcpy(infile, IN_FILE);
       if (myself.set_up(peermode, argv[2], atoi(argv[3]), infile, NULL) < 0)
         errexit(-2);
     }
     else if(!strcmp(argv[4], "-outfile")) {
-      if(argc > 5)
+      if(argc > 5){
         strcpy(outfile, argv[5]);
+	if (argc > 6) {
+	  if(!strcmp(argv[6], "-encrypt"));
+             encrypt = true;
+        }
+      }
       else
 	strcpy(outfile, OUT_FILE);
       if (myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, outfile) < 0)
@@ -264,6 +281,18 @@ int main(int argc, char *argv[]) {
   bool fdin_read_ok = true;
   bool tcp_read_ok = true;
 
+  /* If encryption is enabled, set up crypto object */
+  if(encrypt) {
+      struct passwd *pw = getpwuid(getuid());
+      char *home_dir = pw->pw_dir;
+
+      char *peer_key_path = strcat(home_dir, ".ssh/public.key");
+      char *private_key_path = strcat(home_dir, ".ssh/private.key");
+      
+      RSA *pr = c.createRSA(peer_key_path, false);
+      RSA *pb = c.createRSA(private_key_path, true);
+  }
+  
   /* Main conversation */
   while(1) {
 
@@ -357,14 +386,15 @@ int main(int argc, char *argv[]) {
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
 	printf("\nWriting to output fd\n");
-        int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
-
+	int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
+      
         if(bytes_written == -1) {
+	  std::cout<<"Could not write for output fd"<<std::endl;
           myself.stop();
           return 11;
         }
 
-        total_bytes_out += bytes_written;
+	total_bytes_out += bytes_written;
         printf("total_bytes_out: %d\n", total_bytes_out);
 
         if(bytes_written == msg_for_us_length) {
@@ -381,21 +411,41 @@ int main(int argc, char *argv[]) {
       /* Send a message over TCP */
       if(FD_ISSET(connectedfd, &writefds) && msg_for_friend_length > 0) {
 	printf("\nSending message over TCP\n");
-        int bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
+	int bytes_written_tcp;
+	int msg_length;
+	
+	if(encrypt) {
+	  msg_length = msg_for_friend_length > c.peer_key_size - 11 ? c.peer_key_size - 11 : msg_for_friend_length;
+  	  unsigned char *encrypted = (unsigned char *)malloc(c.peer_key_size);
+	  if(encrypted == NULL) {
+	    std::cout<<"Failed to allocate memory for encrypted message"<<std::endl;
+	    exit(1);
+	  }
+	  c.encrypt((unsigned char *)msg_for_friend, msg_length, encrypted);
+	  bytes_written_tcp = write(myself.get_fd_out(), encrypted, c.peer_key_size);
+	}
+	else 
+	  bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
 
         if(bytes_written_tcp == -1) {
           myself.stop();
           return 11;
         }
-
-        total_bytes_tcp_out += bytes_written_tcp;
+	if(encrypt)
+	  total_bytes_tcp_out += msg_length;
+	else
+	  total_bytes_tcp_out += bytes_written_tcp;
         printf("total_bytes_tcp_sent: %d\n", total_bytes_tcp_out);
 
-        if(bytes_written_tcp == msg_for_friend_length) {
+        if((encrypt && msg_length == msg_for_friend_length) || bytes_written_tcp == msg_for_friend_length) {
           free(msg_for_friend);
           msg_for_friend = NULL;
           msg_for_friend_length = 0;
         }
+	else if(encrypt) {
+	  msg_for_friend += msg_length;
+	  msg_for_friend_length -= msg_length;
+	}
         else {
           msg_for_friend += bytes_written_tcp;
           msg_for_friend_length -= bytes_written_tcp;
@@ -413,27 +463,63 @@ int main(int argc, char *argv[]) {
         }
 
         total_bytes_tcp_in += bytes_read_tcp;
+	if(encrypt)
+	  total_encrypted_msg_for_us_length += bytes_read_tcp;
+	
         printf("total_bytes_tcp_received: %d\n", total_bytes_tcp_in);
-
+	
         if(bytes_read_tcp == 0) {
           tcp_read_ok = false;
           continue;
         }
 
-        msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
-        if(msg_for_us == NULL) {
-          myself.stop();
-          errexit(9);
-        }
-
-        int i = 0;
-        for(char *d = msg_for_us + msg_for_us_length;
+	
+	if(encrypt) {
+	  encrypted_msg_for_us = (char *)realloc(encrypted_msg_for_us, encrypted_msg_for_us_length + bytes_read_tcp);
+	  int i=0;
+	  for(char *d = encrypted_msg_for_us + encrypted_msg_for_us_length;
             i < bytes_read_tcp;
             d++, i++) {
-          *d = *(buffer+i);
-        }
+            *d = *(buffer+i);
+          }
+	  encrypted_msg_for_us_length += bytes_read_tcp;
+	  
+	  if(encrypted_msg_for_us_length == c.private_key_size){
+	     unsigned char *decrypted = (unsigned char*)malloc(c.private_key_size);
+	     if(decrypted == NULL) {
+	       std::cout<<"Failed to allocate memory"<<std::endl;
+	       exit(1);
+             }
+	     c.decrypt((unsigned char *)encrypted_msg_for_us, decrypted);
+	     msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + c.private_key_size);
+	     int i=0;
+	     for(char *d = msg_for_us + msg_for_us_length; i < c.private_key_size; d++, i++) {
+              *d = *(decrypted+i);
+             }
 
-        msg_for_us_length+=bytes_read_tcp;
+	     msg_for_us_length += c.private_key_size;
+	     free(encrypted_msg_for_us);
+	     encrypted_msg_for_us = NULL;
+	     encrypted_msg_for_us_length = 0;
+	  }
+        }
+	else { 
+	  msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
+
+	  if(msg_for_us == NULL) {
+	    myself.stop();
+	    errexit(9);
+	  }
+
+	  int i = 0;
+	  for(char *d = msg_for_us + msg_for_us_length;
+            i < bytes_read_tcp;
+            d++, i++) {
+            *d = *(buffer+i);
+	  }
+
+	  msg_for_us_length+=bytes_read_tcp;
+	}
         //printf("msg_for_us_length: %d\n", msg_for_us_length);
       }
     }
