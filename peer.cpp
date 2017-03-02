@@ -285,22 +285,22 @@ int main(int argc, char *argv[]) {
       int sz = strlen(home_dir);
       
       char *peer_key_path = (char *)malloc(sz);
-      //char *private_key_path = (char *)malloc(sz);
+      char *private_key_path = (char *)malloc(sz);
 
       strcpy(peer_key_path, home_dir);
-      //strcpy(private_key_path, home_dir);
+      strcpy(private_key_path, home_dir);
       
       strcat(peer_key_path, "/.ssh/public.pem");
       peer_key_path[sz+16] = '\0';
 
-      //strcat(private_key_path, "/.ssh/private.pem");
-      //private_key_path[sz+17] = '\0';		\
+      strcat(private_key_path, "/.ssh/private.pem");
+      private_key_path[sz+17] = '\0';		\
 
       printf("\nPeer Key Path: %s\n", peer_key_path);
-      //printf("\nPrivate Key Path: %s\n", private_key_path);
+      printf("\nPrivate Key Path: %s\n", private_key_path);
       
       c.createRSA(peer_key_path, true);
-      //c.createRSA(private_key_path, false);
+      c.createRSA(private_key_path, false);
       
   }
 
