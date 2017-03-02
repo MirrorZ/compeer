@@ -210,6 +210,8 @@ int main(int argc, char *argv[]) {
   sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ][-encrypt]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [-encrypt]\n", argv[0], argv[0]);
   //sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile [infile] ] [ -outfile [outfile] ] [ -inoutfile ]\n", argv[0], argv[0]);
 
+  std::cout<<"argc:"<<argc<<std::endl;
+  
   /* Handle command line arguments for flexibility */
   if(argc < 4 || argc > 7) {
     printf("%s", USAGE);
@@ -233,7 +235,7 @@ int main(int argc, char *argv[]) {
       if(argc > 5) {
         strcpy(infile, argv[5]);
 	if (argc > 6) {
-	  if(!strcmp(argv[6], "-encrypt"));
+	  if(!strcmp(argv[6], "-encrypt"))
              encrypt = true;
         }
       }
@@ -246,7 +248,7 @@ int main(int argc, char *argv[]) {
       if(argc > 5){
         strcpy(outfile, argv[5]);
 	if (argc > 6) {
-	  if(!strcmp(argv[6], "-encrypt"));
+	  if(!strcmp(argv[6], "-encrypt"))
              encrypt = true;
         }
       }
@@ -255,8 +257,14 @@ int main(int argc, char *argv[]) {
       if (myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, outfile) < 0)
         errexit(-2);
     }
+    /* not really using this yet */
     else if(!strcmp(argv[4], "-inoutfile")) {
       if (myself.set_up(peermode, argv[2], atoi(argv[3]), IN_FILE, OUT_FILE) < 0)
+        errexit(-2);
+    }
+    else if(!strcmp(argv[4], "-encrypt")) {
+      encrypt = true;
+      if (myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, NULL) < 0)
         errexit(-2);
     }
     else {
@@ -269,8 +277,36 @@ int main(int argc, char *argv[]) {
       errexit(-1);
   }
 
+  /* If encryption is enabled, set up crypto object */
+  if(encrypt) {
+      struct passwd *pw = getpwuid(getuid());
+      char *home_dir = pw->pw_dir;
+      printf("Home dir:%s\n", home_dir);
+      int sz = strlen(home_dir);
+      
+      char *peer_key_path = (char *)malloc(sz);
+      //char *private_key_path = (char *)malloc(sz);
+
+      strcpy(peer_key_path, home_dir);
+      //strcpy(private_key_path, home_dir);
+      
+      strcat(peer_key_path, "/.ssh/public.pem");
+      peer_key_path[sz+16] = '\0';
+
+      //strcat(private_key_path, "/.ssh/private.pem");
+      //private_key_path[sz+17] = '\0';		\
+
+      printf("\nPeer Key Path: %s\n", peer_key_path);
+      //printf("\nPrivate Key Path: %s\n", private_key_path);
+      
+      c.createRSA(peer_key_path, true);
+      //c.createRSA(private_key_path, false);
+      
+  }
+
   connectedfd = myself.start();
   if(connectedfd < 0) {
+    printf("Failed with connectedfd:%d\n", connectedfd);
     errexit(-2);
   }
 
@@ -280,18 +316,6 @@ int main(int argc, char *argv[]) {
 
   bool fdin_read_ok = true;
   bool tcp_read_ok = true;
-
-  /* If encryption is enabled, set up crypto object */
-  if(encrypt) {
-      struct passwd *pw = getpwuid(getuid());
-      char *home_dir = pw->pw_dir;
-
-      char *peer_key_path = strcat(home_dir, ".ssh/public.key");
-      char *private_key_path = strcat(home_dir, ".ssh/private.key");
-      
-      RSA *pr = c.createRSA(peer_key_path, false);
-      RSA *pb = c.createRSA(private_key_path, true);
-  }
   
   /* Main conversation */
   while(1) {

@@ -1,15 +1,17 @@
 #include "crypto.h"
 
 RSA * Crypto::createRSA(char* filename, bool pub){
+  printf("Got filename:%s\n", filename);
   FILE *fp = fopen(filename, "rb");
+  if(fp==NULL) {
+    perror(strerror(errno));
+    printf("%s - key file does not exist\n", filename);
+    exit(1);
+  }
+  printf("Opened the file\n");
   OpenSSL_add_all_algorithms();
   OpenSSL_add_all_ciphers();
   ERR_load_crypto_strings();
-  if(fp==NULL) {
-    perror(strerror(errno));
-    perror("key file does not exist\n");
-    exit(1);
-  }
 
   RSA *rsa = RSA_new();
   if(pub) {
@@ -20,6 +22,7 @@ RSA * Crypto::createRSA(char* filename, bool pub){
     }
     this->peer_pub = rsa;
     this->peer_key_size = RSA_size(rsa);
+    printf("Public Key loaded\n");
     return this->peer_pub;
   }
   else {
@@ -30,6 +33,7 @@ RSA * Crypto::createRSA(char* filename, bool pub){
     }
     this->private_key = rsa;
     this->private_key_size = RSA_size(rsa);
+    printf("Private key loaded\n");
     return this->private_key;
   }
   return NULL;
