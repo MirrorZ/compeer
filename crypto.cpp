@@ -1,7 +1,11 @@
 #include "crypto.h"
 
 RSA * Crypto::createRSA(char* filename, bool pub){
-  printf("Got filename:%s\n", filename);
+  printf("Got filename: %s\n", filename);
+  OpenSSL_add_all_algorithms();
+  OpenSSL_add_all_ciphers();
+  ERR_load_crypto_strings();
+
   FILE *fp = fopen(filename, "rb");
   if(fp==NULL) {
     perror(strerror(errno));
@@ -9,10 +13,6 @@ RSA * Crypto::createRSA(char* filename, bool pub){
     exit(1);
   }
   printf("Opened the file\n");
-  OpenSSL_add_all_algorithms();
-  OpenSSL_add_all_ciphers();
-  ERR_load_crypto_strings();
-
   RSA *rsa = RSA_new();
   if(pub) {
     rsa = PEM_read_RSA_PUBKEY(fp, &rsa, NULL, NULL);
@@ -46,6 +46,7 @@ int Crypto::encrypt(unsigned char *data, unsigned char *encrypted){
     std::cout<<"Encryption failure: "<<ERR_get_error()<<std::endl;
     exit(1);
   }
+  return rval;
 }
 
 int Crypto::encrypt(unsigned char *data, int data_len, unsigned char *encrypted){
@@ -55,6 +56,7 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char *encrypted)
     std::cout<<"Encryption failure: "<<ERR_get_error()<<std::endl;
     exit(1);
   }
+  return rval;
 }
 
 int Crypto::decrypt(unsigned char *data, unsigned char *decrypted){
@@ -64,6 +66,7 @@ int Crypto::decrypt(unsigned char *data, unsigned char *decrypted){
      std::cout<<"Decryption failure"<<ERR_get_error()<<std::endl;
      exit(1);
    }
+   return rval;
 }
 
 /*
