@@ -195,11 +195,11 @@ int main(int argc, char *argv[]) {
   int retval, nfds;
   int connectedfd;
 
-  char *msg_for_friend = NULL;
+  unsigned char *msg_for_friend = NULL;
   int msg_for_friend_length = 0;
-  char *msg_for_us = NULL;
+  unsigned char *msg_for_us = NULL;
   int msg_for_us_length = 0;
-  char *encrypted_msg_for_us = NULL;
+  unsigned char *encrypted_msg_for_us = NULL;
   int encrypted_msg_for_us_length = 0;
   int total_encrypted_msg_for_us_length = 0;
 
@@ -389,14 +389,20 @@ int main(int argc, char *argv[]) {
 
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
         /* ITEM-n Mask the newline character we get in if it came from stdin ? */
-        msg_for_friend = (char *) realloc(msg_for_friend, msg_for_friend_length + bytes_read);
+	if(msg_for_friend)
+	std::cout<<"msg_for_friend: "<<msg_for_friend<<std::endl;
+	std::cout<<"msg_for_friend_length while reaading:"<<msg_for_friend_length<<std::endl;
+	if(msg_for_friend)
+	  msg_for_friend = (unsigned char *) realloc(msg_for_friend, msg_for_friend_length + bytes_read);
+	else
+	  msg_for_friend = (unsigned char *) malloc(msg_for_friend_length + bytes_read);
         if(msg_for_friend == NULL) {
           myself.stop();
           errexit(9);
         }
 
         int i = 0;
-        for(char *d = msg_for_friend + msg_for_friend_length;
+        for(unsigned char *d = msg_for_friend + msg_for_friend_length;
             i < bytes_read;
             d++, i++) {
           *d = *(buffer+i);
@@ -444,8 +450,11 @@ int main(int argc, char *argv[]) {
 	    std::cout<<"Failed to allocate memory for encrypted message"<<std::endl;
 	    exit(1);
 	  }
-	  c.encrypt((unsigned char *)msg_for_friend, msg_length, encrypted);
-	  bytes_written_tcp = write(myself.get_fd_out(), encrypted, c.peer_key_size);
+	  int l = c.encrypt(msg_for_friend, msg_length, encrypted);
+	  std::cout<<"l:"<<l<<std::endl;
+	  std::cout<<"keyl:"<<c.peer_key_size<<std::endl;
+	  std::cout<<"fd:"<<myself.get_fd_out()<<std::endl;
+	  bytes_written_tcp = write(connectedfd, encrypted, c.peer_key_size);
 	}
 	else 
 	  bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
@@ -455,19 +464,23 @@ int main(int argc, char *argv[]) {
           return 11;
         }
 	if(encrypt)
-	  total_bytes_tcp_out += msg_length;
+	  total_bytes_tcp_out += c.peer_key_size;
 	else
 	  total_bytes_tcp_out += bytes_written_tcp;
         printf("total_bytes_tcp_sent: %d\n", total_bytes_tcp_out);
 
-        if((encrypt && msg_length == msg_for_friend_length) || bytes_written_tcp == msg_for_friend_length) {
-          free(msg_for_friend);
-          msg_for_friend = NULL;
-          msg_for_friend_length = 0;
-        }
+	if((encrypt && msg_length == msg_for_friend_length) || bytes_written_tcp == msg_for_friend_length) {
+	   free(msg_for_friend);
+           msg_for_friend = NULL;
+           msg_for_friend_length = 0;
+	}
 	else if(encrypt) {
+	  std::cout<<"moving ahead by: "<<msg_length<<std::endl;
 	  msg_for_friend += msg_length;
+	  std::cout<<"before msg_for_friend_length: "<<msg_for_friend_length<<std::endl;
 	  msg_for_friend_length -= msg_length;
+	  std::cout<<"msg_for_friend_length: "<<msg_for_friend_length<<std::endl;
+	  std::cout<<"remaining msg: "<<msg_for_friend<<std::endl;
 	}
         else {
           msg_for_friend += bytes_written_tcp;
@@ -498,9 +511,9 @@ int main(int argc, char *argv[]) {
 
 	
 	if(encrypt) {
-	  encrypted_msg_for_us = (char *)realloc(encrypted_msg_for_us, encrypted_msg_for_us_length + bytes_read_tcp);
+	  encrypted_msg_for_us = (unsigned char *)realloc(encrypted_msg_for_us, encrypted_msg_for_us_length + bytes_read_tcp);
 	  int i=0;
-	  for(char *d = encrypted_msg_for_us + encrypted_msg_for_us_length;
+	  for(unsigned char *d = encrypted_msg_for_us + encrypted_msg_for_us_length;
             i < bytes_read_tcp;
             d++, i++) {
             *d = *(buffer+i);
@@ -514,9 +527,9 @@ int main(int argc, char *argv[]) {
 	       exit(1);
              }
 	     c.decrypt((unsigned char *)encrypted_msg_for_us, decrypted);
-	     msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + c.private_key_size);
+	     msg_for_us = (unsigned char *) realloc(msg_for_us, msg_for_us_length + c.private_key_size);
 	     int i=0;
-	     for(char *d = msg_for_us + msg_for_us_length; i < c.private_key_size; d++, i++) {
+	     for(unsigned char *d = msg_for_us + msg_for_us_length; i < c.private_key_size; d++, i++) {
               *d = *(decrypted+i);
              }
 
@@ -527,7 +540,7 @@ int main(int argc, char *argv[]) {
 	  }
         }
 	else { 
-	  msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
+	  msg_for_us = (unsigned char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
 
 	  if(msg_for_us == NULL) {
 	    myself.stop();
@@ -535,7 +548,7 @@ int main(int argc, char *argv[]) {
 	  }
 
 	  int i = 0;
-	  for(char *d = msg_for_us + msg_for_us_length;
+	  for(unsigned char *d = msg_for_us + msg_for_us_length;
             i < bytes_read_tcp;
             d++, i++) {
             *d = *(buffer+i);
