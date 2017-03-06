@@ -196,7 +196,9 @@ int main(int argc, char *argv[]) {
   int connectedfd;
 
   unsigned char *msg_for_friend = NULL;
+  unsigned char *send_msg_for_friend = NULL;
   int msg_for_friend_length = 0;
+  int total_msg_for_friend_length = 0;
   unsigned char *msg_for_us = NULL;
   int msg_for_us_length = 0;
   unsigned char *encrypted_msg_for_us = NULL;
@@ -392,23 +394,22 @@ int main(int argc, char *argv[]) {
 	if(msg_for_friend)
 	std::cout<<"msg_for_friend: "<<msg_for_friend<<std::endl;
 	std::cout<<"msg_for_friend_length while reaading:"<<msg_for_friend_length<<std::endl;
-	if(msg_for_friend)
-	  msg_for_friend = (unsigned char *) realloc(msg_for_friend, msg_for_friend_length + bytes_read);
-	else
-	  msg_for_friend = (unsigned char *) malloc(msg_for_friend_length + bytes_read);
+	
+	msg_for_friend = (unsigned char *) realloc(msg_for_friend, total_msg_for_friend_length + bytes_read);
         if(msg_for_friend == NULL) {
           myself.stop();
           errexit(9);
         }
 
         int i = 0;
-        for(unsigned char *d = msg_for_friend + msg_for_friend_length;
+        for(unsigned char *d = msg_for_friend + total_msg_for_friend_length;
             i < bytes_read;
             d++, i++) {
           *d = *(buffer+i);
         }
 
         msg_for_friend_length+=bytes_read;
+	total_msg_for_friend_length+=bytes_read;
         //printf("msg_for_friend_length: %d\n", msg_for_friend_length);
       }
 
@@ -439,6 +440,8 @@ int main(int argc, char *argv[]) {
 
       /* Send a message over TCP */
       if(FD_ISSET(connectedfd, &writefds) && msg_for_friend_length > 0) {
+	if(send_msg_for_friend == NULL)
+	  send_msg_for_friend = msg_for_friend;
 	printf("\nSending message over TCP\n");
 	int bytes_written_tcp;
 	int msg_length;
@@ -450,14 +453,14 @@ int main(int argc, char *argv[]) {
 	    std::cout<<"Failed to allocate memory for encrypted message"<<std::endl;
 	    exit(1);
 	  }
-	  int l = c.encrypt(msg_for_friend, msg_length, encrypted);
+	  int l = c.encrypt(send_msg_for_friend, msg_length, encrypted);
 	  std::cout<<"l:"<<l<<std::endl;
 	  std::cout<<"keyl:"<<c.peer_key_size<<std::endl;
 	  std::cout<<"fd:"<<myself.get_fd_out()<<std::endl;
 	  bytes_written_tcp = write(connectedfd, encrypted, c.peer_key_size);
 	}
 	else 
-	  bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
+	  bytes_written_tcp = write(connectedfd, send_msg_for_friend, msg_for_friend_length);
 
         if(bytes_written_tcp == -1) {
           myself.stop();
@@ -471,19 +474,21 @@ int main(int argc, char *argv[]) {
 
 	if((encrypt && msg_length == msg_for_friend_length) || bytes_written_tcp == msg_for_friend_length) {
 	   free(msg_for_friend);
+	   send_msg_for_friend = NULL;
            msg_for_friend = NULL;
            msg_for_friend_length = 0;
+	   total_msg_for_friend_length = 0;
 	}
 	else if(encrypt) {
 	  std::cout<<"moving ahead by: "<<msg_length<<std::endl;
-	  msg_for_friend += msg_length;
+	  send_msg_for_friend += msg_length;
 	  std::cout<<"before msg_for_friend_length: "<<msg_for_friend_length<<std::endl;
 	  msg_for_friend_length -= msg_length;
 	  std::cout<<"msg_for_friend_length: "<<msg_for_friend_length<<std::endl;
 	  std::cout<<"remaining msg: "<<msg_for_friend<<std::endl;
 	}
         else {
-          msg_for_friend += bytes_written_tcp;
+          send_msg_for_friend += bytes_written_tcp;
           msg_for_friend_length -= bytes_written_tcp;
         }
       }
