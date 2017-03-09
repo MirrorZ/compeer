@@ -297,7 +297,6 @@ int main(int argc, char *argv[]) {
   if(encrypt) {
       struct passwd *pw = getpwuid(getuid());
       char *home_dir = pw->pw_dir;
-      printf("Home dir:%s\n", home_dir);
       int sz = strlen(home_dir);
 
       
@@ -305,7 +304,7 @@ int main(int argc, char *argv[]) {
       strcpy(peer_key_path, home_dir);
       strcat(peer_key_path, "/.ssh/public.pem");
       peer_key_path[sz+16] = '\0';
-      printf("\nPeer Key Path: %s\n", peer_key_path);
+      printf("\nLoading peer key from: %s\n", peer_key_path);
       c.createRSA(peer_key_path, true);
 
       
@@ -313,7 +312,7 @@ int main(int argc, char *argv[]) {
       strcpy(private_key_path, home_dir);
       strcat(private_key_path, "/.ssh/private.pem");
       private_key_path[sz+17] = '\0';
-      printf("\nPrivate Key Path: %s\n", private_key_path);      
+      printf("\nLoading private key from: %s\n", private_key_path);      
       c.createRSA(private_key_path, false);
       
   }
@@ -402,7 +401,6 @@ int main(int argc, char *argv[]) {
         }
 
         total_bytes_in += bytes_read;
-        printf("bytes_read : %d\n", bytes_read);
 
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
         /* ITEM-n Mask the newline character we get in if it came from stdin ? */
@@ -508,17 +506,16 @@ int main(int argc, char *argv[]) {
         }
 
         total_bytes_tcp_in += bytes_read_tcp;
-        printf("bytes_read_tcp: %d\n", bytes_read_tcp);
+	printf("bytes_read_tcp: %d\n", bytes_read_tcp);
 	printf("total_bytes_tcp_in: %d\n", total_bytes_tcp_in);
 	
-        if(bytes_read_tcp == 0) {
+        if(bytes_read_tcp == 0 && encrypted_msg_for_us_length == 0) {
           tcp_read_ok = false;
           continue;
         }
 
 	
 	if(encrypt) {
-	  printf("encrypted_msg_for_us_length:%d",encrypted_msg_for_us_length);
 	  encrypted_msg_for_us = (unsigned char *)realloc(encrypted_msg_for_us, total_encrypted_msg_for_us_length + bytes_read_tcp);
           if(recv_encrypted_msg_for_us == NULL)
 	    recv_encrypted_msg_for_us = encrypted_msg_for_us;
@@ -546,11 +543,9 @@ int main(int argc, char *argv[]) {
               *d = *(decrypted+i);
              }
 
-	     msg_for_us_length += len;
-	     printf("msg_for_us_length:%d\n",msg_for_us_length);
-	     
+	     msg_for_us_length += len;	     
 	     if(encrypted_msg_for_us_length == c.private_key_size) {
-	       printf("\nClearing up\n");
+	       //printf("\nClearing up\n");
 	       free(encrypted_msg_for_us);
 	       encrypted_msg_for_us = NULL;
 	       recv_encrypted_msg_for_us = NULL;
@@ -560,7 +555,6 @@ int main(int argc, char *argv[]) {
 	     else {
 	       recv_encrypted_msg_for_us += c.private_key_size;
 	       encrypted_msg_for_us_length -= c.private_key_size;
-	       printf("encrypted_msg_for_us_length after decryption:%d", encrypted_msg_for_us_length);
 	     }
 	  }
         }
