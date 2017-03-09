@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
 
   char USAGE[200];
   char buffer[BUFF_SIZE];
-  buffer[256] = '\0';
+  //buffer[256] = '\0';
   char infile[BUFF_SIZE], outfile[BUFF_SIZE];
   bool encrypt = false;
 
@@ -223,8 +223,6 @@ int main(int argc, char *argv[]) {
    */
   sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ][-encrypt]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ] [-encrypt]\n", argv[0], argv[0]);
   //sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile [infile] ] [ -outfile [outfile] ] [ -inoutfile ]\n", argv[0], argv[0]);
-
-  std::cout<<"argc:"<<argc<<std::endl;
   
   /* Handle command line arguments for flexibility */
   if(argc < 4 || argc > 7) {
@@ -427,7 +425,7 @@ int main(int argc, char *argv[]) {
 	int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
       
         if(bytes_written == -1) {
-	  std::cout<<"Could not write for output fd"<<std::endl;
+	  printf("Could not write for output fd\n");
           myself.stop();
           return 11;
         }
@@ -459,7 +457,7 @@ int main(int argc, char *argv[]) {
 	  msg_length = msg_for_friend_length > c.peer_key_size - 11 ? c.peer_key_size - 11 : msg_for_friend_length;
   	  unsigned char *encrypted = (unsigned char *)malloc(c.peer_key_size);
 	  if(encrypted == NULL) {
-	    std::cout<<"Failed to allocate memory for encrypted message"<<std::endl;
+	    printf("Failed to allocate memory for encrypted message\n");
 	    exit(1);
 	  }
 	  int l = c.encrypt(send_msg_for_friend, msg_length, encrypted);
@@ -531,7 +529,7 @@ int main(int argc, char *argv[]) {
 	  if(encrypted_msg_for_us_length >= c.private_key_size){
 	     unsigned char *decrypted = (unsigned char*)malloc(c.private_key_size);
 	     if(decrypted == NULL) {
-	       std::cout<<"Failed to allocate memory"<<std::endl;
+	       printf("Failed to allocate memory for decrypted message\n");
 	       exit(1);
              }
 	     int len = c.decrypt((unsigned char *)recv_encrypted_msg_for_us, decrypted);
