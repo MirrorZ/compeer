@@ -7,9 +7,9 @@ Decentralised peer to peer messenger
 ~~Handle multiple messages correctly~~
 
 ~~Handle disconnection~~
-* Add Signal Handlers 
 * Enable Encryption
-
+* Fix command line parsing
+* IPv6 support
 
 ### Generating key pair 
  Use openssl to generate key pair for encrypted communication:
