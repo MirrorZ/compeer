@@ -357,6 +357,8 @@ int main(int argc, char *argv[]) {
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
         //	printf("\nWriting to output fd\n");
+
+        write(myself.get_fd_out(), "> ", 2);
         int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
 
         if(bytes_written == -1) {
