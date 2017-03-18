@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -6,7 +7,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <unistd.h>
-#include <errno.h>
 #include <string.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -36,7 +36,7 @@ void errexit(int lastcode) {
 
 class peer {
   int mode;
-  struct sockaddr_in peersock_addr;
+  struct sockaddr_in6 peersock_addr;
   socklen_t peersock_addr_size;
   int fd_this_side;
   int fd_other_side;
@@ -81,17 +81,19 @@ public:
     if(outfile != NULL)
       file_output = std::string(outfile);
 
-    fd_this_side = socket(AF_INET, SOCK_STREAM, 0);
+    fd_this_side = socket(AF_INET6, SOCK_STREAM, 0);
     if(fd_this_side == -1)
       return -1;
 
-    memset(&peersock_addr, 0, sizeof(struct sockaddr_in));
-    peersock_addr.sin_family = AF_INET;
-    peersock_addr.sin_port = htons(port);
-    inet_pton(AF_INET, IP, &peersock_addr.sin_addr);
+    memset(&peersock_addr, 0, sizeof(struct sockaddr_in6));
+    peersock_addr.sin6_family = AF_INET6;
+    peersock_addr.sin6_port = htons(port);
+    peersock_addr.sin6_flowinfo = 0;
+    inet_pton(AF_INET6, IP, &peersock_addr.sin6_addr);
+    peersock_addr.sin6_scope_id = 0;
 
     if(mode == WAIT_FOR_FRIEND) {
-      if(bind(fd_this_side, (struct sockaddr *)&peersock_addr, sizeof(struct sockaddr_in)) == -1) {
+      if(bind(fd_this_side, (struct sockaddr *)&peersock_addr, sizeof(struct sockaddr_in6)) == -1) {
         stop();
         return -2;
       }
@@ -132,7 +134,7 @@ public:
   int start(void) {
 
     printf("[START] Starting up peer with mode = %d\n", mode);
-    peersock_addr_size = sizeof(struct sockaddr_in);
+    peersock_addr_size = sizeof(struct sockaddr_in6);
 
     /* There are only 2 modes */
     if(mode == WAIT_FOR_FRIEND) {
