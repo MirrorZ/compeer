@@ -318,9 +318,9 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
-	printf("\nInput fd set\n");
+        //	printf("\nInput fd set\n");
         int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer) - 1);
-        printf("Bytes read in: %d\n", bytes_read);
+        //        printf("Bytes read in: %d\n", bytes_read);
 
         if(bytes_read < 0) {
           myself.stop();
@@ -356,7 +356,7 @@ int main(int argc, char *argv[]) {
 
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
-	printf("\nWriting to output fd\n");
+        //	printf("\nWriting to output fd\n");
         int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
 
         if(bytes_written == -1) {
@@ -365,7 +365,7 @@ int main(int argc, char *argv[]) {
         }
 
         total_bytes_out += bytes_written;
-        printf("total_bytes_out: %d\n", total_bytes_out);
+        //        printf("total_bytes_out: %d\n", total_bytes_out);
 
         if(bytes_written == msg_for_us_length) {
           free(msg_for_us);
@@ -380,7 +380,7 @@ int main(int argc, char *argv[]) {
 
       /* Send a message over TCP */
       if(FD_ISSET(connectedfd, &writefds) && msg_for_friend_length > 0) {
-	printf("\nSending message over TCP\n");
+        //	printf("\nSending message over TCP\n");
         int bytes_written_tcp = write(connectedfd, msg_for_friend, msg_for_friend_length);
 
         if(bytes_written_tcp == -1) {
@@ -389,7 +389,7 @@ int main(int argc, char *argv[]) {
         }
 
         total_bytes_tcp_out += bytes_written_tcp;
-        printf("total_bytes_tcp_sent: %d\n", total_bytes_tcp_out);
+        //        printf("total_bytes_tcp_sent: %d\n", total_bytes_tcp_out);
 
         if(bytes_written_tcp == msg_for_friend_length) {
           free(msg_for_friend);
@@ -404,7 +404,7 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
-	printf("\nReceived message\n");
+        //	printf("\nReceived message\n");
         int bytes_read_tcp = read(connectedfd, buffer, sizeof(buffer) - 1);
 
         if(bytes_read_tcp == -1) {
@@ -413,7 +413,7 @@ int main(int argc, char *argv[]) {
         }
 
         total_bytes_tcp_in += bytes_read_tcp;
-        printf("total_bytes_tcp_received: %d\n", total_bytes_tcp_in);
+        //        printf("total_bytes_tcp_received: %d\n", total_bytes_tcp_in);
 
         if(bytes_read_tcp == 0) {
           tcp_read_ok = false;
