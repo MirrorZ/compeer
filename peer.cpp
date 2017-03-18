@@ -300,7 +300,7 @@ int main(int argc, char *argv[]) {
       
       char *peer_key_path = (char *)malloc(sz+16);
       strcpy(peer_key_path, home_dir);
-      strcat(peer_key_path, "/.ssh/public.pem");
+      strcat(peer_key_path, "/.ssh/peer.pem");
       peer_key_path[sz+16] = '\0';
       printf("\nLoading peer key from: %s\n", peer_key_path);
       c.createRSA(peer_key_path, true);
