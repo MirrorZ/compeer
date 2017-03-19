@@ -1,4 +1,4 @@
-#include <stdio.h>
+ #include   <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -300,7 +300,7 @@ int main(int argc, char *argv[]) {
       
       char *peer_key_path = (char *)malloc(sz+16);
       strcpy(peer_key_path, home_dir);
-      strcat(peer_key_path, "/.ssh/peer.pem");
+      strcat(peer_key_path, "/.ssh/public.pem");
       peer_key_path[sz+16] = '\0';
       printf("\nLoading peer key from: %s\n", peer_key_path);
       c.createRSA(peer_key_path, true);
@@ -387,6 +387,7 @@ int main(int argc, char *argv[]) {
 	printf("\nInput fd set\n");
         int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer));
         printf("Bytes read in: %d\n", bytes_read);
+	//printf("Bytes read :%s\n", buffer);
 
         if(bytes_read < 0) {
           myself.stop();
@@ -460,8 +461,10 @@ int main(int argc, char *argv[]) {
 	    printf("Failed to allocate memory for encrypted message\n");
 	    exit(1);
 	  }
+	  //printf("Msg for friend to encrypt: %.*s\n", msg_length, send_msg_for_friend);
 	  int l = c.encrypt(send_msg_for_friend, msg_length, encrypted);
 	  bytes_written_tcp = write(connectedfd, encrypted, c.peer_key_size);
+	  printf("Sending: %s\n", encrypted);
 	}
 	else 
 	  bytes_written_tcp = write(connectedfd, send_msg_for_friend, msg_for_friend_length);
@@ -495,9 +498,12 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
+	buffer[0]='\0';
 	printf("\nReceived message\n");
         int bytes_read_tcp = read(connectedfd, buffer, sizeof(buffer));
-
+	buffer[bytes_read_tcp]='\n';
+	printf("\n\nbytes read tcp: %s\n\n", buffer);
+	printf("buffer size %ld\n", sizeof(buffer));
         if(bytes_read_tcp == -1) {
           myself.stop();
           return 10;
@@ -512,7 +518,6 @@ int main(int argc, char *argv[]) {
           continue;
         }
 
-	
 	if(encrypt) {
 	  encrypted_msg_for_us = (unsigned char *)realloc(encrypted_msg_for_us, total_encrypted_msg_for_us_length + bytes_read_tcp);
           if(recv_encrypted_msg_for_us == NULL)
@@ -523,6 +528,8 @@ int main(int argc, char *argv[]) {
 	  for(unsigned char *d = encrypted_msg_for_us + total_encrypted_msg_for_us_length; i < bytes_read_tcp; d++, i++) {
             *d = *(buffer+i);
           }
+
+	  printf("\n\n\nEncryoted_msg_for_us %s\n\n\n", encrypted_msg_for_us);
 	  encrypted_msg_for_us_length += bytes_read_tcp;
 	  total_encrypted_msg_for_us_length += bytes_read_tcp;
 	  
@@ -532,10 +539,11 @@ int main(int argc, char *argv[]) {
 	       printf("Failed to allocate memory for decrypted message\n");
 	       exit(1);
              }
+	     printf("Decrypting %s\n", recv_encrypted_msg_for_us);
 	     int len = c.decrypt((unsigned char *)recv_encrypted_msg_for_us, decrypted);
 	     decrypted[len]='\0';
-	     printf("Decrypted length: %d\n", len);
-	     msg_for_us = (unsigned char *) realloc(msg_for_us, msg_for_us_length + c.private_key_size);
+	     //printf("Decrypted msg: %s\n", decrypted);
+	     msg_for_us = (unsigned char *) realloc(msg_for_us, msg_for_us_length + len);
 	     int i=0;
 	     for(unsigned char *d = msg_for_us + msg_for_us_length; i < len; d++, i++) {
               *d = *(decrypted+i);
@@ -543,7 +551,7 @@ int main(int argc, char *argv[]) {
 
 	     msg_for_us_length += len;	     
 	     if(encrypted_msg_for_us_length == c.private_key_size) {
-	       //printf("\nClearing up\n");
+	       printf("\nClearing up\n");
 	       free(encrypted_msg_for_us);
 	       encrypted_msg_for_us = NULL;
 	       recv_encrypted_msg_for_us = NULL;
@@ -555,6 +563,7 @@ int main(int argc, char *argv[]) {
 	       encrypted_msg_for_us_length -= c.private_key_size;
 	     }
 	  }
+	  printf("Encrypted_msg_for_us_length: %d\n", encrypted_msg_for_us_length);
         }
 	else {
 	  msg_for_us = (unsigned char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
