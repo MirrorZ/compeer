@@ -7,7 +7,7 @@
 
 unset ENCFLAG
 # Set to 0 to disable.
-ENCRYPT=0
+ENCRYPT=1
 
 CPP_FILES=$(git ls-files *.cpp | grep -Fv 'peer.cpp')
 [[ "$ENCRYPT" -eq 1 ]] && ENCFLAG=-encrypt
