@@ -190,7 +190,6 @@ int main(int argc, char *argv[]) {
 
   char USAGE[200];
   char buffer[BUFF_SIZE];
-  //buffer[256] = '\0';
   char infile[BUFF_SIZE], outfile[BUFF_SIZE];
   bool encrypt = false;
 
@@ -198,7 +197,7 @@ int main(int argc, char *argv[]) {
   fd_set writefds;
   fd_set exceptfds;
 
-  int retval, nfds;
+  int nfds;
   int connectedfd;
 
   unsigned char *msg_for_friend = NULL;
@@ -297,14 +296,12 @@ int main(int argc, char *argv[]) {
     char *home_dir = pw->pw_dir;
     int sz = strlen(home_dir);
 
-      
     char *peer_key_path = (char *)malloc(sz+16);
     strcpy(peer_key_path, home_dir);
     strcat(peer_key_path, "/.ssh/public.pem");
     peer_key_path[sz+16] = '\0';
     printf("\nLoading peer key from: %s\n", peer_key_path);
     c.createRSA(peer_key_path, true);
-
       
     char *private_key_path = (char *)malloc(sz+17);
     strcpy(private_key_path, home_dir);
@@ -312,7 +309,6 @@ int main(int argc, char *argv[]) {
     private_key_path[sz+17] = '\0';
     printf("\nLoading private key from: %s\n", private_key_path);      
     c.createRSA(private_key_path, false);
-      
   }
 
   connectedfd = myself.start();
@@ -320,8 +316,6 @@ int main(int argc, char *argv[]) {
     printf("Failed with connectedfd:%d\n", connectedfd);
     errexit(-2);
   }
-
-  int logfile = 0;
 
   printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
 
@@ -384,26 +378,23 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
-        printf("\nInput fd set\n");
-        int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer));
-        printf("Bytes read in: %d\n", bytes_read);
-        //printf("Bytes read :%s\n", buffer);
+        int bytes_stdin_in = read(myself.get_fd_in(), buffer, sizeof(buffer));
 
-        if(bytes_read < 0) {
+        if(bytes_stdin_in < 0) {
           myself.stop();
           return 8;
         }
 
-        if(bytes_read == 0) {
+        if(bytes_stdin_in == 0) {
           fdin_read_ok = false;
           continue;
         }
 
-        total_bytes_in += bytes_read;
+        total_bytes_in += bytes_stdin_in;
 
-        /* We don't care about user pressing Enter directly (bytes_read = 1)*/
+        /* We don't care about user pressing Enter directly (bytes_stdin_in = 1)*/
         /* ITEM-n Mask the newline character we get in if it came from stdin ? */
-        msg_for_friend = (unsigned char *) realloc(msg_for_friend, total_msg_for_friend_length + bytes_read);
+        msg_for_friend = (unsigned char *) realloc(msg_for_friend, total_msg_for_friend_length + bytes_stdin_in);
         if(msg_for_friend == NULL) {
           myself.stop();
           errexit(9);
@@ -411,37 +402,38 @@ int main(int argc, char *argv[]) {
 
         int i = 0;
         for(unsigned char *d = msg_for_friend + total_msg_for_friend_length;
-            i < bytes_read;
+            i < bytes_stdin_in;
             d++, i++) {
           *d = *(buffer+i);
         }
 
-        msg_for_friend_length+=bytes_read; // todo: this should be used by sender block
-        total_msg_for_friend_length+=bytes_read;
+        msg_for_friend_length+=bytes_stdin_in; // todo: this should be used by sender block
+        total_msg_for_friend_length+=bytes_stdin_in;
       }
 
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
-        printf("\nWriting to output fd\n");
-        int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
+        // printf("\nWriting to output fd\n");
+        write(myself.get_fd_out(), "> ", 2);
+        int bytes_stdout_out = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
       
-        if(bytes_written == -1) {
+        if(bytes_stdout_out == -1) {
           printf("Could not write for output fd\n");
           myself.stop();
           return 11;
         }
 
-        total_bytes_out += bytes_written;
-        printf("total_bytes_out: %d\n", total_bytes_out);
+        total_bytes_out += bytes_stdout_out;
+        //        printf("total_bytes_out: %d\n", total_bytes_out);
 
-        if(bytes_written == msg_for_us_length) {
+        if(bytes_stdout_out == msg_for_us_length) {
           free(msg_for_us);
           msg_for_us = NULL;
           msg_for_us_length = 0;
         }
         else {
-          msg_for_us += bytes_written;
-          msg_for_us_length -= bytes_written;
+          msg_for_us += bytes_stdout_out;
+          msg_for_us_length -= bytes_stdout_out;
         }
       }
 
@@ -451,9 +443,10 @@ int main(int argc, char *argv[]) {
           send_msg_for_friend = msg_for_friend;
 
         printf("\nSending message over TCP\n");
-        int bytes_written_tcp;
+        int bytes_tcp_out;
         int msg_length;
-	
+
+        printf("Plain message length: %d\n", msg_for_friend_length);
         if(encrypt) {
           msg_length = msg_for_friend_length > c.peer_key_size - 11 ? c.peer_key_size - 11 : msg_for_friend_length;
           unsigned char *encrypted = (unsigned char *) malloc(c.peer_key_size);
@@ -464,23 +457,29 @@ int main(int argc, char *argv[]) {
 
           //printf("Msg for friend to encrypt: %.*s\n", msg_length, send_msg_for_friend);
           int l = c.encrypt(send_msg_for_friend, msg_length, encrypted);
-          bytes_written_tcp = write(connectedfd, encrypted, c.peer_key_size);
-          printf("Sending over tcp: %X\n", encrypted);
+
+          printf("Sending encrypted msg tcp: ");
+          for(int i = 0; i< l; i++)
+            printf("%x,", encrypted[i]);
+          printf("\n");
+
+          bytes_tcp_out = write(connectedfd, encrypted, c.peer_key_size);
         }
         else 
-          bytes_written_tcp = write(connectedfd, send_msg_for_friend, msg_for_friend_length);
+          bytes_tcp_out = write(connectedfd, send_msg_for_friend, msg_for_friend_length);
 
-        if(bytes_written_tcp == -1) {
+        printf("bytes_tcp_out: %d\n", bytes_tcp_out);
+
+        if(bytes_tcp_out == -1) {
           myself.stop();
           return 11;
         }
-        if(encrypt)
-          total_bytes_tcp_out += c.peer_key_size;
-        else
-          total_bytes_tcp_out += bytes_written_tcp;
-        printf("total_bytes_tcp_sent: %d\n", total_bytes_tcp_out);
 
-        if((encrypt && msg_length == msg_for_friend_length) || bytes_written_tcp == msg_for_friend_length) {
+        total_bytes_tcp_out += bytes_tcp_out;
+
+        printf("total_bytes_tcp_out: %d\n", total_bytes_tcp_out);
+
+        if((encrypt && msg_length == msg_for_friend_length) || bytes_tcp_out == msg_for_friend_length) {
           free(msg_for_friend);
           send_msg_for_friend = NULL;
           msg_for_friend = NULL;
@@ -492,26 +491,24 @@ int main(int argc, char *argv[]) {
           msg_for_friend_length -= msg_length;
         }
         else {
-          send_msg_for_friend += bytes_written_tcp;
-          msg_for_friend_length -= bytes_written_tcp;
+          send_msg_for_friend += bytes_tcp_out;
+          msg_for_friend_length -= bytes_tcp_out;
         }
       }
 
       /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
-        buffer[0]='\0';
-        printf("\nReceived message\n");
-        int bytes_read_tcp = read(connectedfd, buffer, sizeof(buffer));
-        buffer[bytes_read_tcp]='\n';
-        printf("\n\nReceived over TCP: %X\n\n", buffer);
         printf("buffer size %ld\n", sizeof(buffer));
+        int bytes_read_tcp = read(connectedfd, buffer, sizeof(buffer));
+
+        printf("bytes_read_tcp: %d\n", bytes_read_tcp);
+
         if(bytes_read_tcp == -1) {
           myself.stop();
           return 10;
         }
 
         total_bytes_tcp_in += bytes_read_tcp;
-        printf("bytes_read_tcp: %d\n", bytes_read_tcp);
         printf("total_bytes_tcp_in: %d\n", total_bytes_tcp_in);
 	
         if(bytes_read_tcp == 0 && encrypted_msg_for_us_length == 0) {
@@ -530,7 +527,11 @@ int main(int argc, char *argv[]) {
             *d = *(buffer+i);
           }
 
-          printf("\n\n\nEncryoted_msg_for_us %X\n\n\n", encrypted_msg_for_us);
+          printf("Encrypted_msg_for_us: ");
+          for(int i = 0; i< bytes_read_tcp; i++)
+            printf("%x,", encrypted_msg_for_us[i]);
+          printf("\n");
+
           encrypted_msg_for_us_length += bytes_read_tcp;
           total_encrypted_msg_for_us_length += bytes_read_tcp;
 	  
@@ -540,20 +541,19 @@ int main(int argc, char *argv[]) {
               printf("Failed to allocate memory for decrypted message\n");
               exit(1);
             }
-            printf("Decrypting %X\n", recv_encrypted_msg_for_us);
-            int len = c.decrypt((unsigned char *)recv_encrypted_msg_for_us, decrypted);
-            decrypted[len]='\0';
 
-            //printf("Decrypted msg: %s\n", decrypted);
-            msg_for_us = (unsigned char *) realloc(msg_for_us, msg_for_us_length + len);
+            int decryptedlen = c.decrypt((unsigned char *)recv_encrypted_msg_for_us, decrypted);
+            decrypted[decryptedlen]='\0';
+            printf("Decrypted msg length: %d\n", decryptedlen);
+            msg_for_us = (unsigned char *) realloc(msg_for_us, msg_for_us_length + decryptedlen);
             int i=0;
-            for(unsigned char *d = msg_for_us + msg_for_us_length; i < len; d++, i++) {
+            for(unsigned char *d = msg_for_us + msg_for_us_length; i < decryptedlen; d++, i++) {
               *d = *(decrypted+i);
             }
 
-            msg_for_us_length += len;	     
+            msg_for_us_length += decryptedlen;	     
             if(encrypted_msg_for_us_length == c.private_key_size) {
-              printf("\nClearing up\n");
+              //              printf("\nClearing up\n");
               free(encrypted_msg_for_us);
               encrypted_msg_for_us = NULL;
               recv_encrypted_msg_for_us = NULL;
@@ -565,7 +565,7 @@ int main(int argc, char *argv[]) {
               encrypted_msg_for_us_length -= c.private_key_size;
             }
           }
-          printf("Encrypted_msg_for_us_length: %d\n", encrypted_msg_for_us_length);
+          //          printf("Encrypted_msg_for_us_length: %d\n", encrypted_msg_for_us_length);
         }
         else {
           msg_for_us = (unsigned char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
@@ -576,11 +576,8 @@ int main(int argc, char *argv[]) {
           }
 
           int i = 0;
-          for(unsigned char *d = msg_for_us + msg_for_us_length;
-              i < bytes_read_tcp;
-              d++, i++) {
+          for(unsigned char *d = msg_for_us + msg_for_us_length; i < bytes_read_tcp; d++, i++)
             *d = *(buffer+i);
-          }
 
           msg_for_us_length+=bytes_read_tcp;
         }

@@ -8,6 +8,7 @@
 #include <openssl/err.h>
 
 class Crypto {
+
 public:
   RSA *peer_pub;
   RSA *private_key;
