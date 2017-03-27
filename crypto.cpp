@@ -39,16 +39,6 @@ RSA * Crypto::createRSA(char* filename, bool pub){
   return NULL;
 }
 
-int Crypto::encrypt(unsigned char *data, unsigned char *encrypted){
-  int rval;
-  rval = RSA_public_encrypt(strlen((const char *)data), data, encrypted, this->peer_pub, padding);
-  if(rval==-1){
-    std::cout<<"Encryption failure: "<<ERR_get_error()<<std::endl;
-    exit(1);
-  }
-  return rval;
-}
-
 int Crypto::encrypt(unsigned char *data, int data_len, unsigned char *encrypted){
   int rval;
   rval = RSA_public_encrypt(data_len, data, encrypted, this->peer_pub, padding);
@@ -61,12 +51,14 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char *encrypted)
 
 int Crypto::decrypt(unsigned char *data, unsigned char *decrypted){
   int rval;
-  rval = RSA_private_decrypt(this->private_key_size,  (const unsigned char *)data, decrypted, this->private_key, padding);
-   if(rval==-1){
-     std::cout<<"Decryption failure"<<ERR_get_error()<<std::endl;
-     exit(1);
-   }
-   return rval;
+  rval = RSA_private_decrypt(this->private_key_size, (const unsigned char *)data, decrypted, this->private_key, padding);
+
+  if(rval==-1){
+    std::cout<<"Decryption failure"<<ERR_get_error()<<std::endl;
+    exit(1);
+  }
+
+  return rval;
 }
 
 /*
