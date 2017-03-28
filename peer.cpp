@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <algorithm>
 #include <iostream>
+#include <getopt.h>
 
 #define CONNECT_TO_FRIEND 999
 #define WAIT_FOR_FRIEND   998
@@ -65,15 +66,9 @@ public:
     return fd_output_file;
   }
 
-  int set_up(int mode_to_set, char *IP, int port, char *infile, char *outfile) {
+  int set_up(bool hasfriend, char *IP, int port, char *infile, char *outfile) {
 
-    printf("[SETUP] MODE : %s\n", mode_to_set == WAIT_FOR_FRIEND ? "WAIT_FOR_FRIEND" :
-    mode_to_set == CONNECT_TO_FRIEND ? "CONNECT_TO_FRIEND" : "UNKNOWN");
-    printf("[SETUP] IP:Port : %s:%d\n", IP, port);
-    //    printf("[SETUP] input file : %s\n", infile == NULL ? "stdin" : infile);
-    //    printf("[SETUP] output file : %s\n", outfile == NULL ? "stdout" : outfile);
-
-    mode = mode_to_set;
+    mode = (hasfriend == true ? CONNECT_TO_FRIEND : WAIT_FOR_FRIEND);
 
     if(infile != NULL)
       file_input = std::string(infile);
@@ -179,85 +174,68 @@ public:
 
 int main(int argc, char *argv[]) {
 
-  char USAGE[200];
   char buffer[1025];
   buffer[1024] = '\0';
-  char infile[1024], outfile[1024];
 
   fd_set readfds;
   fd_set writefds;
   fd_set exceptfds;
 
-  int retval, nfds;
+  int nfds;
   int connectedfd;
-
+  bool hasfriend = true;
   char *msg_for_friend = NULL;
   int msg_for_friend_length = 0;
   char *msg_for_us = NULL;
   int msg_for_us_length = 0;
 
-  int peermode;
-
   nfds = 0;
+  int opt;
+  char *ip = NULL;
+  int port;
 
-  sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile ]\n", argv[0], argv[0]);
-  //sprintf(USAGE, "Usage: \n\t%s -listen listenIP listenPORT [ -infile ] [ -outfile] [ -inoutfile ]\n\tOR\n\t%s -friend friendIP friendPort [ -infile [infile] ] [ -outfile [outfile] ] [ -inoutfile ]\n", argv[0], argv[0]);
-
-  /* Handle command line arguments for flexibility */
-  if(argc < 4 || argc > 6) {
-    printf("%s", USAGE);
-    return 1;
+  if(argc!=6) {
+    fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT\n", argv[0]);
+    exit(EXIT_FAILURE);
   }
 
-  if(!strcmp(argv[1], "-listen")) {
-    peermode = WAIT_FOR_FRIEND;
-  }
-  else if(!strcmp(argv[1], "-friend")) {
-    peermode = CONNECT_TO_FRIEND;
-  }
-  else {
-    printf("%s", USAGE);
-    errexit(2);
+  while((opt = getopt(argc, argv, "lfi:p:")) != -1) {
+    switch(opt) {
+
+    case 'f':
+      hasfriend = true;
+      break;
+
+    case 'l':
+      hasfriend = false;
+      break;
+
+    case 'i':
+      ip = strdup(optarg);
+      break;
+
+    case 'p':
+      port = atoi(optarg);
+      break;
+
+   default:
+     fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT\n", argv[0]);
+     exit(EXIT_FAILURE);
+    }
   }
 
   peer myself;
-  if(argc > 4) {
-    if(!strcmp(argv[4], "-infile")) {
-      if(argc > 5)
-        strcpy(infile, argv[5]);
-      else
-	strcpy(infile, IN_FILE);
-      if (myself.set_up(peermode, argv[2], atoi(argv[3]), infile, NULL) < 0)
-        errexit(-2);
-    }
-    else if(!strcmp(argv[4], "-outfile")) {
-      if(argc > 5)
-        strcpy(outfile, argv[5]);
-      else
-	strcpy(outfile, OUT_FILE);
-      if (myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, outfile) < 0)
-        errexit(-2);
-    }
-    else if(!strcmp(argv[4], "-inoutfile")) {
-      if (myself.set_up(peermode, argv[2], atoi(argv[3]), IN_FILE, OUT_FILE) < 0)
-        errexit(-2);
-    }
-    else {
-      printf("%s", USAGE);
-      errexit(1);
-    }
-  }
-  else {
-    if(myself.set_up(peermode, argv[2], atoi(argv[3]), NULL, NULL) < 0)
-      errexit(-1);
+  int ret = myself.set_up(hasfriend, ip, port, NULL, NULL);
+
+  if(ret < 0) {
+    printf("We are fucked\n");
+    exit(10);
   }
 
   connectedfd = myself.start();
   if(connectedfd < 0) {
     errexit(-2);
   }
-
-  int logfile = 0;
 
   printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
 
