@@ -1,5 +1,5 @@
 #include "crypto.h"
-
+#include "util.h"
 Crypto::Crypto(){
   struct passwd *pw = getpwuid(getuid());
   char *home_dir = pw->pw_dir;
@@ -9,7 +9,7 @@ Crypto::Crypto(){
   strcpy(private_key_path, home_dir);
   strcat(private_key_path, "/.ssh/private.pem");
   private_key_path[sz+17] = '\0';
-  printf("\nLoading private key from: %s\n", private_key_path);
+  printf("\nprivate key: %s\n", private_key_path);
   createRSA(private_key_path, false);
 }
 
@@ -20,7 +20,7 @@ void Crypto::set_peer_key(char *peer_key_path){
     char path[50] = ".vault/peer.pem";
     peer_key_path = path;
   }
-  printf("\nLoading friend's public key from: %s\n", peer_key_path);
+  printf("\npublic key: %s\n", peer_key_path);
   createRSA(peer_key_path, true);
   
   /* For RSA_PKCS1_PADDING maximum message length can be the key size - 11 */
@@ -70,6 +70,9 @@ RSA * Crypto::createRSA(char* filename, bool pub){
 int Crypto::encrypt(unsigned char *data, int data_len, unsigned char *encrypted){
   int rval;
   int len, encrypted_length=0;
+
+  printf("=============>IN FUNC: %u\n", encrypted);
+
   while(data_len!=0){
     len = data_len > this->max_message_length ? this->max_message_length : data_len;
     printf("Encrypting %d data \n", len);
@@ -93,7 +96,11 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char *encrypted)
     encrypted_length += rval;
   }
   encrypted[encrypted_length] = '\0';
-  printf("Sending %s with length %d\n", encrypted, encrypted_length);
+  printf("=============>IN FUNC (after realloc): %u\n", encrypted);
+
+  printf("Returning ");
+  print_block(encrypted, encrypted_length);
+
   return encrypted_length;
 }
 
@@ -123,20 +130,28 @@ int main(int argc, char *argv[]) {
   //RSA *pb = c.createRSA(argv[2], true);
   
   //unsigned char *msg = (unsigned char*)strdup("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
   unsigned char *msg = (unsigned char*)strdup("aaaaa");
   //int pb_size = RSA_size(pb);
   unsigned char* encrypted = (unsigned char *)malloc(strlen((const char*)msg));
-  c.encrypt(msg, strlen((const char*)msg), encrypted);
-  std::cout<<"Encrypted message:"<<encrypted<<std::endl;
-  
+  printf("======> IN MAIN: %u\n", encrypted);
+  int elen = c.encrypt(msg, strlen((const char*)msg), encrypted);
+  printf("======> IN MAIN: %u\n", encrypted);
+  std::cout<<"Returned data: ";
+  print_block(encrypted, elen);
   //int pr_size = RSA_size(pr);
+
+
+  return 1;
+
+
   unsigned char *decrypted = (unsigned char*)malloc(c.private_key_size);
   if(decrypted == NULL) {
     std::cout<<"Failed to allocate memory"<<std::endl;
     exit(1);
    }
-  c.decrypt(encrypted, decrypted);
-  std::cout<<"Decrypted message: "<<decrypted<<std::endl;
+  int dlen = c.decrypt(encrypted, decrypted);
+  std::cout<<"[len = " << dlen << "]" << "Decrypted message: "<<decrypted<<std::endl;
   
   return 0;
   }
