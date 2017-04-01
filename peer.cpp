@@ -1,23 +1,21 @@
+#include <algorithm>
+#include <arpa/inet.h>
 #include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <iostream>
+#include <netinet/in.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <errno.h>
 #include <string.h>
-#include <signal.h>
+#include <sys/select.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <algorithm>
-#include <iostream>
-#include <getopt.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#define CONNECT_TO_FRIEND 999
-#define WAIT_FOR_FRIEND   998
 #define IN_FILE "/tmp/peerin"
 #define OUT_FILE "/tmp/peerout"
 
@@ -32,7 +30,7 @@ int total_bytes_tcp_out = 0;
 */
 
 class peer {
-  int mode;
+  bool hasfriend;
   struct sockaddr_in peersock_addr;
   socklen_t peersock_addr_size;
   int fd_this_side;
@@ -51,7 +49,6 @@ public:
     fd_input_file = 0;
     fd_output_file = 1;
 
-    mode = 0;
   }
 
   int get_fd_in(void) {
@@ -62,9 +59,9 @@ public:
     return fd_output_file;
   }
 
-  void set_up(bool hasfriend, char *IP, int port, char *infile, char *outfile) {
+  void set_up(bool friendexists, char *IP, int port, char *infile, char *outfile) {
 
-    mode = (hasfriend == true ? CONNECT_TO_FRIEND : WAIT_FOR_FRIEND);
+    hasfriend = friendexists;
 
     if(infile != NULL)
       file_input = std::string(infile);
@@ -80,12 +77,9 @@ public:
     peersock_addr.sin_port = htons(port);
     inet_pton(AF_INET, IP, &peersock_addr.sin_addr);
 
-    if(mode == WAIT_FOR_FRIEND) {
+    if(hasfriend == false) {
       assert(bind(fd_this_side, (struct sockaddr *)&peersock_addr, sizeof(struct sockaddr_in)) != -1);
       assert(listen(fd_this_side, 1) != -1);
-    }
-    else if(mode == CONNECT_TO_FRIEND) {
-      ;
     }
 
     /* in_file  */
@@ -103,21 +97,17 @@ public:
 
   int start(void) {
 
-    printf("[START] Starting up peer with mode = %d\n", mode);
+    printf("[START] Starting up peer [Has a friend?: %s]\n", hasfriend == true ? "Yes" : "No");
     peersock_addr_size = sizeof(struct sockaddr_in);
 
-    /* There are only 2 modes */
-    if(mode == WAIT_FOR_FRIEND) {
-      fd_other_side = accept(fd_this_side, (struct sockaddr *) &peersock_addr,
-                            &peersock_addr_size);
-
+    /* modus operandi */
+    if(hasfriend == false) {
+      fd_other_side = accept(fd_this_side, (struct sockaddr *) &peersock_addr, &peersock_addr_size);
       assert(fd_other_side >= 0);
       return fd_other_side;
     }
-    else if(mode == CONNECT_TO_FRIEND) {
-      assert(connect(fd_this_side, (struct sockaddr *) &peersock_addr,
-                     peersock_addr_size) == 0);
-
+    else {
+      assert(connect(fd_this_side, (struct sockaddr *) &peersock_addr, peersock_addr_size) == 0);
       return fd_this_side;
     }
 
