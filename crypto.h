@@ -24,6 +24,6 @@ public:
   Crypto();
   void set_peer_key(char *peer_key_path);
   RSA * createRSA(char* filename, bool pub);   // Creates RSA structure from key file
-  int encrypt(unsigned char *data, int data_len, unsigned char *encrypted);
-  int decrypt(unsigned char *data, unsigned char *decrypted);
+  int encrypt(unsigned char *data, int data_len, unsigned char*& encrypted);
+  int decrypt(unsigned char *data, int data_len, unsigned char*& decrypted);
 };

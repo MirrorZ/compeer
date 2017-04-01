@@ -67,10 +67,10 @@ RSA * Crypto::createRSA(char* filename, bool pub){
   return NULL;
 }
 
-int Crypto::encrypt(unsigned char *data, int data_len, unsigned char *encrypted){
+int Crypto::encrypt(unsigned char *data, int data_len, unsigned char*& encrypted_data){
   int rval;
   int len, encrypted_length=0;
-
+  unsigned char *encrypted = NULL;
   printf("=============>IN FUNC: %u\n", encrypted);
 
   while(data_len!=0){
@@ -95,18 +95,56 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char *encrypted)
     
     encrypted_length += rval;
   }
-  encrypted[encrypted_length] = '\0';
+  // encrypted[encrypted_length] = '\0';
   printf("=============>IN FUNC (after realloc): %u\n", encrypted);
 
   printf("Returning ");
   print_block(encrypted, encrypted_length);
 
+  encrypted_data = encrypted;
   return encrypted_length;
 }
 
-int Crypto::decrypt(unsigned char *data, unsigned char *decrypted){
+int Crypto::decrypt(unsigned char* data, int data_len, unsigned char*& decrypted_data){
+  
   int rval;
-  printf("Got data %s, using %d\n", data, this->private_key_size);
+  int len, decrypted_length=0;
+  unsigned char *block_decrypted = NULL;
+  unsigned char *decrypted = NULL;
+  unsigned int size = this->private_key_size;
+
+  
+  while(data_len>=size){
+    unsigned char *block_decrypted = (unsigned char*)malloc(size);
+    if(block_decrypted == NULL) {
+      std::cout<<"Failed to allocate memory"<<std::endl;
+      exit(1);
+    }
+     printf("Decrypting\n");
+     print_block(data, data_len);
+ 
+    rval = RSA_private_decrypt(size, (const unsigned char *)data, block_decrypted, this->private_key, padding);
+
+    if(rval==-1){
+      std::cout<<"Decryption failure: "<<ERR_get_error()<<std::endl;
+      exit(1);
+    }
+    data += size;
+    data_len -= size;
+    
+    decrypted = (unsigned char *)realloc(decrypted, decrypted_length+rval);
+    for(int i=0; i<rval; i++)
+      decrypted[i+decrypted_length] = block_decrypted[i];
+    decrypted_length += rval;
+    printf("Decrypted_length: %d\n", decrypted_length);
+  }
+
+  decrypted_data = decrypted;
+  printf("\nIn decrypt: %s\n", decrypted);
+  return decrypted_length;
+  
+  /*
+
   rval = RSA_private_decrypt(this->private_key_size, (const unsigned char *)data, decrypted, this->private_key, padding);
 
   if(rval==-1){
@@ -114,7 +152,7 @@ int Crypto::decrypt(unsigned char *data, unsigned char *decrypted){
     exit(1);
   }
 
-  return rval;
+  return rval;*/
 }
 
 
@@ -129,30 +167,30 @@ int main(int argc, char *argv[]) {
   //RSA *pr = c.createRSA(argv[1], false);
   //RSA *pb = c.createRSA(argv[2], true);
   
-  //unsigned char *msg = (unsigned char*)strdup("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  unsigned char *msg = (unsigned char*)strdup("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 
-  unsigned char *msg = (unsigned char*)strdup("aaaaa");
+  //unsigned char *msg = (unsigned char*)strdup("aaaaa");
   //int pb_size = RSA_size(pb);
-  unsigned char* encrypted = (unsigned char *)malloc(strlen((const char*)msg));
+  unsigned char* encrypted = NULL;  //(unsigned char *)malloc(strlen((const char*)msg));
   printf("======> IN MAIN: %u\n", encrypted);
   int elen = c.encrypt(msg, strlen((const char*)msg), encrypted);
   printf("======> IN MAIN: %u\n", encrypted);
   std::cout<<"Returned data: ";
   print_block(encrypted, elen);
-  //int pr_size = RSA_size(pr);
+  // int pr_size = RSA_size(pr);
+  // return 1;
 
-
-  return 1;
-
-
-  unsigned char *decrypted = (unsigned char*)malloc(c.private_key_size);
-  if(decrypted == NULL) {
+  unsigned char *decrypted = NULL;//(unsigned char*)malloc(c.private_key_size);
+  /*if(decrypted == NULL) {
     std::cout<<"Failed to allocate memory"<<std::endl;
     exit(1);
-   }
-  int dlen = c.decrypt(encrypted, decrypted);
-  std::cout<<"[len = " << dlen << "]" << "Decrypted message: "<<decrypted<<std::endl;
-  
+    }*/
+
+
+  int dlen = c.decrypt(encrypted, elen, decrypted);
+  decrypted[dlen]='\0';
+  printf("Decrypted data [%d]: %s\n", dlen, decrypted);
+
   return 0;
   }
 
