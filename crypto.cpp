@@ -13,18 +13,18 @@ Crypto::Crypto(){
   createRSA(private_key_path, false);
 }
 
-void Crypto::set_peer_key(char *peer_key_path){
+void Crypto::set_public_key(char *public_key_path){
   
-  if(peer_key_path == NULL) {
-    printf("Using default peer key path (~/compeer/.vault/peer.pem");
-    char path[50] = ".vault/peer.pem";
-    peer_key_path = path;
+  if(public_key_path == NULL) {
+    printf("Using default public key path (~/compeer/.vault/public.pem");
+    char path[50] = ".vault/public.pem";
+    public_key_path = path;
   }
-  printf("\npublic key: %s\n", peer_key_path);
-  createRSA(peer_key_path, true);
+  printf("\npublic key: %s\n", public_key_path);
+  createRSA(public_key_path, true);
   
   /* For RSA_PKCS1_PADDING maximum message length can be the key size - 11 */
-  this->max_message_length = this->peer_key_size - 11;
+  this->max_message_length = this->public_key_size - 11;
   printf("Setting max_message_length: %d\n", this->max_message_length);
 }
 
@@ -45,13 +45,13 @@ RSA * Crypto::createRSA(char* filename, bool pub){
   if(pub) {
     rsa = PEM_read_RSA_PUBKEY(fp, &rsa, NULL, NULL);
     if(rsa == NULL) {
-      perror("failure loading peer key\n");
+      perror("failure loading public key\n");
       exit(1);
     }
-    this->peer_pub = rsa;
-    this->peer_key_size = RSA_size(rsa);
+    this->public_key = rsa;
+    this->public_key_size = RSA_size(rsa);
     printf("Public Key loaded\n");
-    return this->peer_pub;
+    return this->public_key;
   }
   else {
     rsa = PEM_read_RSAPrivateKey(fp, &rsa, NULL, NULL);
@@ -76,16 +76,17 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char*& encrypted
   while(data_len!=0){
     len = data_len > this->max_message_length ? this->max_message_length : data_len;
     printf("Encrypting %d data \n", len);
-    unsigned char *block_encrypted = (unsigned char*)malloc(this->peer_key_size);
+    unsigned char *block_encrypted = (unsigned char*)malloc(this->public_key_size);
     if(block_encrypted == NULL) {
       std::cout<<"Failed to allocate memory"<<std::endl;
       exit(1);
     }
-    rval = RSA_public_encrypt(len, data, block_encrypted, this->peer_pub, padding);
+    rval = RSA_public_encrypt(len, data, block_encrypted, this->public_key, padding);
     if(rval==-1){
       std::cout<<"Encryption failure: "<<ERR_get_error()<<std::endl;
       exit(1);
     }
+
     /* update the pointers */
     data += len;
     data_len -= len;
@@ -158,11 +159,11 @@ int Crypto::decrypt(unsigned char* data, int data_len, unsigned char*& decrypted
 
 int main(int argc, char *argv[]) {
   /*if(argc<3) {
-    std::cout<<"Usage: /path/to/private/pem /path/to/peer/public/pem message"<<std::endl;
+    std::cout<<"Usage: /path/to/private/pem /path/to/public/pem message"<<std::endl;
     exit(1);
     }*/
   Crypto c;
-  c.set_peer_key(NULL);
+  c.set_public_key(NULL);
   
   //RSA *pr = c.createRSA(argv[1], false);
   //RSA *pb = c.createRSA(argv[2], true);

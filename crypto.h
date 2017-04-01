@@ -14,15 +14,15 @@ class Crypto {
 
 public:
   
-  RSA *peer_pub;
+  RSA *public_key;
   RSA *private_key;
-  unsigned int peer_key_size;
+  unsigned int public_key_size;
   unsigned int private_key_size;
   int padding = RSA_PKCS1_PADDING;
   int max_message_length;
 
   Crypto();
-  void set_peer_key(char *peer_key_path);
+  void set_public_key(char *public_key_path);
   RSA * createRSA(char* filename, bool pub);   // Creates RSA structure from key file
   int encrypt(unsigned char *data, int data_len, unsigned char*& encrypted);
   int decrypt(unsigned char *data, int data_len, unsigned char*& decrypted);
