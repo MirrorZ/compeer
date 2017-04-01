@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -24,11 +25,6 @@ int total_bytes_in = 0;
 int total_bytes_tcp_in = 0;
 int total_bytes_out = 0;
 int total_bytes_tcp_out = 0;
-
-void errexit(int lastcode) {
-  perror(strerror(errno));
-  exit(lastcode);
-}
 
 /*
    Stick to TCP for now.
@@ -233,9 +229,7 @@ int main(int argc, char *argv[]) {
   }
 
   connectedfd = myself.start();
-  if(connectedfd < 0) {
-    errexit(-2);
-  }
+  assert(connectedfd >= 0);
 
   printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
 
@@ -277,12 +271,9 @@ int main(int argc, char *argv[]) {
 
     /* Wait for data to arrive on the socket or stdin or a new connection */
     int selection = select(nfds, &readfds, &writefds, &exceptfds, NULL);
+    assert(selection != -1);
 
-    if(selection == -1) {
-      myself.stop();
-      errexit(7);
-    }
-    else if(selection) {
+    if(selection) {
 
       /* Exceptions with the connected peer */
       /* ITEM-n Replace with a list of peers ? Or atleast an || condition for other fd */
@@ -316,10 +307,7 @@ int main(int argc, char *argv[]) {
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
         /* ITEM-n Mask the newline character we get in if it came from stdin ? */
         msg_for_friend = (char *) realloc(msg_for_friend, msg_for_friend_length + bytes_read);
-        if(msg_for_friend == NULL) {
-          myself.stop();
-          errexit(9);
-        }
+        assert(msg_for_friend != NULL);
 
         int i = 0;
         for(char *d = msg_for_friend + msg_for_friend_length;
@@ -399,10 +387,7 @@ int main(int argc, char *argv[]) {
         }
 
         msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
-        if(msg_for_us == NULL) {
-          myself.stop();
-          errexit(9);
-        }
+        assert(msg_for_us != NULL);
 
         int i = 0;
         for(char *d = msg_for_us + msg_for_us_length;
