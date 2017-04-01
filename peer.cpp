@@ -62,7 +62,7 @@ public:
     return fd_output_file;
   }
 
-  int set_up(bool hasfriend, char *IP, int port, char *infile, char *outfile) {
+  void set_up(bool hasfriend, char *IP, int port, char *infile, char *outfile) {
 
     mode = (hasfriend == true ? CONNECT_TO_FRIEND : WAIT_FOR_FRIEND);
 
@@ -73,8 +73,7 @@ public:
       file_output = std::string(outfile);
 
     fd_this_side = socket(AF_INET, SOCK_STREAM, 0);
-    if(fd_this_side == -1)
-      return -1;
+    assert(fd_this_side != -1);
 
     memset(&peersock_addr, 0, sizeof(struct sockaddr_in));
     peersock_addr.sin_family = AF_INET;
@@ -100,8 +99,6 @@ public:
       fd_output_file = open(file_output.c_str(), O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG);
       assert(fd_output_file != -1);
     }
-
-    return 0;
   }
 
   int start(void) {
@@ -196,15 +193,8 @@ int main(int argc, char *argv[]) {
   }
 
   peer myself;
-  int ret = myself.set_up(hasfriend, ip, port, NULL, NULL);
-
-  if(ret < 0) {
-    printf("We are fucked\n");
-    exit(10);
-  }
-
-  connectedfd = myself.start();
-  assert(connectedfd >= 0);
+  myself.set_up(hasfriend, ip, port, NULL, NULL);
+  assert((connectedfd = myself.start()) >= 0);
 
   printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
 
@@ -219,7 +209,7 @@ int main(int argc, char *argv[]) {
     FD_ZERO(&exceptfds);
 
     /* If nothing to send or receive, tear down and break */
-    if((!fdin_read_ok && msg_for_friend_length<=0) || (!tcp_read_ok && msg_for_us_length<=0)) {
+    if((!fdin_read_ok && msg_for_friend_length <= 0) || (!tcp_read_ok && msg_for_us_length <= 0)) {
       myself.stop();
       break;
     }
@@ -278,13 +268,7 @@ int main(int argc, char *argv[]) {
         msg_for_friend = (char *) realloc(msg_for_friend, msg_for_friend_length + bytes_read);
         assert(msg_for_friend != NULL);
 
-        int i = 0;
-        for(char *d = msg_for_friend + msg_for_friend_length;
-            i < bytes_read;
-            d++, i++) {
-          *d = *(buffer+i);
-        }
-
+        memcpy(msg_for_friend + msg_for_friend_length, buffer, bytes_read);
         msg_for_friend_length+=bytes_read;
       }
 
@@ -341,13 +325,7 @@ int main(int argc, char *argv[]) {
         msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
         assert(msg_for_us != NULL);
 
-        int i = 0;
-        for(char *d = msg_for_us + msg_for_us_length;
-            i < bytes_read_tcp;
-            d++, i++) {
-          *d = *(buffer+i);
-        }
-
+        memcpy(msg_for_us + msg_for_us_length, buffer, bytes_read_tcp);
         msg_for_us_length+=bytes_read_tcp;
       }
     }
