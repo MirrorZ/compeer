@@ -16,7 +16,7 @@ Crypto::Crypto(){
 void Crypto::set_public_key(char *public_key_path){
   
   if(public_key_path == NULL) {
-    printf("Using default public key path (~/compeer/.vault/public.pem");
+    printf("Using default public key path (.vault/public.pem");
     char path[50] = ".vault/public.pem";
     public_key_path = path;
   }
@@ -106,23 +106,23 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char*& encrypted
   return encrypted_length;
 }
 
-int Crypto::decrypt(unsigned char* data, int data_len, unsigned char*& decrypted_data){
+int Crypto::decrypt(unsigned char* data, int *data_len, unsigned char*& decrypted_data){
   
   int rval;
   int len, decrypted_length=0;
   unsigned char *block_decrypted = NULL;
   unsigned char *decrypted = NULL;
   unsigned int size = this->private_key_size;
-
+  int data_length = *data_len;
   
-  while(data_len>=size){
+  while(data_length>=size){
     unsigned char *block_decrypted = (unsigned char*)malloc(size);
     if(block_decrypted == NULL) {
       std::cout<<"Failed to allocate memory"<<std::endl;
       exit(1);
     }
      printf("Decrypting\n");
-     print_block(data, data_len);
+     //print_block(data, data_len);
  
     rval = RSA_private_decrypt(size, (const unsigned char *)data, block_decrypted, this->private_key, padding);
 
@@ -131,7 +131,7 @@ int Crypto::decrypt(unsigned char* data, int data_len, unsigned char*& decrypted
       exit(1);
     }
     data += size;
-    data_len -= size;
+    data_length -= size;
     
     decrypted = (unsigned char *)realloc(decrypted, decrypted_length+rval);
     for(int i=0; i<rval; i++)
@@ -142,6 +142,8 @@ int Crypto::decrypt(unsigned char* data, int data_len, unsigned char*& decrypted
 
   decrypted_data = decrypted;
   printf("\nIn decrypt: %s\n", decrypted);
+
+  *data_len = data_length;
   return decrypted_length;
   
   /*
@@ -187,8 +189,9 @@ int main(int argc, char *argv[]) {
     exit(1);
     }*/
 
-
-  int dlen = c.decrypt(encrypted, elen, decrypted);
+  elen -=2;
+  int dlen = c.decrypt(encrypted, &elen, decrypted);
+  printf("Len remaining %d\n", elen);
   decrypted[dlen]='\0';
   printf("Decrypted data [%d]: %s\n", dlen, decrypted);
 
