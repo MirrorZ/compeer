@@ -159,11 +159,11 @@ int main(int argc, char *argv[]) {
   int port;
 
   if(argc!=6) {
-    fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT\n", argv[0]);
+    fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
     exit(EXIT_FAILURE);
   }
 
-  while((opt = getopt(argc, argv, "lfi:p:")) != -1) {
+  while((opt = getopt(argc, argv, "lfh:p:i:o:")) != -1) {
     switch(opt) {
 
     case 'f':
@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
       hasfriend = false;
       break;
 
-    case 'i':
+    case 'h':
       ip = strdup(optarg);
       break;
 
@@ -182,8 +182,18 @@ int main(int argc, char *argv[]) {
       port = atoi(optarg);
       break;
 
+    case 'i':
+      file_in = (char *) malloc(strlen(optarg));
+      strcpy(file_in, optarg);
+      break;
+
+    case 'o':
+      file_out = (char *) malloc(strlen(optarg));
+      strcpy(file_out, optarg);
+      break;
+
    default:
-     fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT\n", argv[0]);
+     fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
      exit(EXIT_FAILURE);
     }
   }
