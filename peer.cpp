@@ -358,6 +358,7 @@ int main(int argc, char *argv[]) {
 	  if(unencrypted_length==0) {
 	    free(decrypt_msg);
 	    decrypt_msg = NULL;
+	    total_decrypt_msg_length = 0;
 	    decrypt_from = 0;
 	  }
 	  else {
