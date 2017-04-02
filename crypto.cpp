@@ -194,6 +194,10 @@ int main(int argc, char *argv[]) {
   printf("Len remaining %d\n", elen);
   decrypted[dlen]='\0';
   printf("Decrypted data [%d]: %s\n", dlen, decrypted);
+  dlen = c.decrypt(encrypted, &elen, decrypted);
+  decrypted[dlen]='\0';
+  printf("Decrypted data [%d]: %s\n", dlen, decrypted);
+  
 
   return 0;
   }
