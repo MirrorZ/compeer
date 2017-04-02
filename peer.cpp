@@ -36,8 +36,6 @@ class peer {
   socklen_t peersock_addr_size;
   int fd_this_side;
   int fd_other_side;
-  std::string file_input;
-  std::string file_output;
   int fd_input_file;
   int fd_output_file;
 
@@ -64,18 +62,17 @@ public:
 
     hasfriend = friendexists;
 
-    if(infile != NULL)
-      file_input = std::string(infile);
-
-    if(outfile != NULL)
-      file_output = std::string(outfile);
+    printf("Input file: %s\n", infile == NULL ? "NULL": infile);
+    printf("Output file: %s\n", outfile == NULL ? "NULL": outfile);
 
     fd_this_side = socket(AF_INET, SOCK_STREAM, 0);
     assert(fd_this_side != -1);
 
     memset(&peersock_addr, 0, sizeof(struct sockaddr_in));
+
     peersock_addr.sin_family = AF_INET;
     peersock_addr.sin_port = htons(port);
+
     inet_pton(AF_INET, IP, &peersock_addr.sin_addr);
 
     if(hasfriend == false) {
@@ -83,15 +80,13 @@ public:
       assert(listen(fd_this_side, 1) != -1);
     }
 
-    /* in_file  */
-    if(file_input.length() > 0) {
-      fd_input_file = open(file_input.c_str(), O_RDONLY);
+    if(infile != NULL) {
+      fd_input_file = open(infile, O_RDONLY);
       assert(fd_input_file != -1);
     }
 
-    /* out_file */
-    if(file_output.length() > 0) {
-      fd_output_file = open(file_output.c_str(), O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG);
+    if(outfile != NULL) {
+      fd_output_file = open(outfile, O_WRONLY | O_CREAT, S_IRWXU | S_IRWXG);
       assert(fd_output_file != -1);
     }
   }
@@ -156,15 +151,15 @@ int main(int argc, char *argv[]) {
   nfds = 0;
   int opt;
   char *ip = NULL;
-  int port;
-  char *file_in = NULL, *file_out = NULL;
+  int port = -1;
+  char *file_in=NULL, *file_out=NULL;
 
-  if(! (argc > 5 && argc < 9)) {
-      fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
-      exit(EXIT_FAILURE);
+  if(argc!=6 && argc!=8 && argc!=10) {
+    fprintf(stderr, "Usage: %s [-f | -l] -h IP -p PORT [-i infile] [-o outfile]\n", argv[0]);
+    exit(EXIT_FAILURE);
   }
 
-  while((opt = getopt(argc, argv, "lfh:p:i:o:")) != -1) {
+  while((opt = getopt(argc, argv, "lfi:p:h:o:")) != -1) {
     switch(opt) {
 
     case 'f':
@@ -177,6 +172,7 @@ int main(int argc, char *argv[]) {
 
     case 'h':
       ip = strdup(optarg);
+      printf("ip is : %s\n", ip);
       break;
 
     case 'p':
@@ -184,22 +180,26 @@ int main(int argc, char *argv[]) {
       break;
 
     case 'i':
-      file_in = (char *) malloc(strlen(optarg));
+      file_in = (char *) malloc(strlen(optarg) + 1);
       assert(file_in != NULL);
       strcpy(file_in, optarg);
       break;
 
     case 'o':
-      file_out = (char *) malloc(strlen(optarg));
+      file_out = (char *) malloc(strlen(optarg) + 1);
       assert(file_out != NULL);
       strcpy(file_out, optarg);
       break;
 
    default:
-     fprintf(stderr, "Usage: %s [-f | -l] -h HOST -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
+     fprintf(stderr, "Usage: %s [-f | -l] -h IP -p PORT [-i infile] [-o outfile]\n", argv[0]);
      exit(EXIT_FAILURE);
     }
   }
+
+  assert(ip!=NULL);
+  assert(port!=-1);
+
 
   peer myself;
   Crypto crypto;
@@ -208,7 +208,6 @@ int main(int argc, char *argv[]) {
   assert((connectedfd = myself.start()) >= 0);
 
   printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
-
   bool fdin_read_ok = true;
   bool tcp_read_ok = true;
 
