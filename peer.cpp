@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
       exit(EXIT_FAILURE);
   }
 
-  while((opt = getopt(argc, argv, "lfhp:i:o:")) != -1) {
+  while((opt = getopt(argc, argv, "lfh:p:i:o:")) != -1) {
     switch(opt) {
 
     case 'f':
