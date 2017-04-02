@@ -15,3 +15,4 @@ CPP_FILES=$(git ls-files *.cpp | grep -Fv 'peer.cpp')
 alias mkcm="rm -f compeer; g++ peer.cpp $CPP_FILES -o compeer -Wall -lcrypto"
 alias cml='./compeer -listen localhost 20000 $ENCFLAG'
 alias cmf='./compeer -friend localhost 20000 $ENCFLAG'
+
