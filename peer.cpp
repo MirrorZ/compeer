@@ -290,7 +290,7 @@ int main(int argc, char *argv[]) {
 
         memcpy(msg_for_friend + msg_for_friend_length, message, bytes_send);
         printf("Sending message for friend\n");
-        print_block(msg_for_friend, bytes_send);
+        // print_block(msg_for_friend, bytes_send);
         msg_for_friend_length += bytes_send;
 
       }
@@ -362,9 +362,9 @@ int main(int argc, char *argv[]) {
 	  printf("Before decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
 
 	  printf("Decrypt_msg looks like:\n");
-	  print_block(decrypt_msg, total_decrypt_msg_length);
+	  // print_block(decrypt_msg, total_decrypt_msg_length);
 	  printf("Sending to decrypt\n");
-	  print_block(decrypt_msg+decrypt_from, data_len);
+	  // print_block(decrypt_msg+decrypt_from, data_len);
 
 	  bytes_to_write = crypto.decrypt(decrypt_msg+decrypt_from, data_len, message, &unencrypted_length); 
 	  if(unencrypted_length==0) {
@@ -378,7 +378,7 @@ int main(int argc, char *argv[]) {
 	  }
 
 	  printf("\nAfter decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
-	  
+
 	  printf("After Decrypt_msg looks like:\n");
 	  //print_block(decrypt_msg, data_len);
 	}
