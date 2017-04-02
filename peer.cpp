@@ -157,6 +157,7 @@ int main(int argc, char *argv[]) {
   int opt;
   char *ip = NULL;
   int port;
+  char *file_in = NULL, *file_out = NULL;
 
   if(argc!=6) {
     fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
@@ -201,7 +202,7 @@ int main(int argc, char *argv[]) {
   peer myself;
   Crypto crypto;
   crypto.set_public_key(NULL);
-  myself.set_up(hasfriend, ip, port, NULL, NULL);
+  myself.set_up(hasfriend, ip, port, file_in, file_out);
   assert((connectedfd = myself.start()) >= 0);
 
   printf("[MAIN] Connection established with connectedfd = %d.\n", connectedfd);
