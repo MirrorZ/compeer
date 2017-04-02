@@ -1,3 +1,5 @@
+#ifndef _CRYPTO_H_
+#define _CRYPTO_H_
 #include <stdio.h>
 #include <string.h>
 #include <iostream>
@@ -28,3 +30,4 @@ public:
   int encrypt(unsigned char *data, int data_len, unsigned char*& encrypted);
   int decrypt(unsigned char *data, int* data_len, unsigned char*& decrypted);
 };
+#endif /* _CRYPTO_H_ */
