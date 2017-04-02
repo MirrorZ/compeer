@@ -159,8 +159,8 @@ int main(int argc, char *argv[]) {
   int port;
   char *file_in = NULL, *file_out = NULL;
 
-  if(argc!=6) {
-    fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
+  if(! (argc > 5 && argc < 9)) {
+      fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
     exit(EXIT_FAILURE);
   }
 
@@ -185,11 +185,13 @@ int main(int argc, char *argv[]) {
 
     case 'i':
       file_in = (char *) malloc(strlen(optarg));
+      assert(file_in != NULL);
       strcpy(file_in, optarg);
       break;
 
     case 'o':
       file_out = (char *) malloc(strlen(optarg));
+      assert(file_out != NULL);
       strcpy(file_out, optarg);
       break;
 
