@@ -1,3 +1,5 @@
+#ifndef _UTIL_H_
+#define _UTIL_H_
 void print_block(unsigned char* block, int len) {
   printf("Block [ len = %d]\n", len);
 
@@ -6,3 +8,4 @@ void print_block(unsigned char* block, int len) {
     printf("%02x,", block[i]);
   printf("%02x\n", block[len]);
 }
+#endif /* _UTIL_H_ */
