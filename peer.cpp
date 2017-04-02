@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include "crypto.h"
 
 #define IN_FILE "/tmp/peerin"
 #define OUT_FILE "/tmp/peerout"
@@ -48,7 +49,6 @@ public:
     /* STDIN and STDOUT by default */
     fd_input_file = 0;
     fd_output_file = 1;
-
   }
 
   int get_fd_in(void) {
@@ -132,8 +132,10 @@ public:
 
 int main(int argc, char *argv[]) {
 
-  char buffer[1025];
+  unsigned char buffer[1025];
   buffer[1024] = '\0';
+
+  bool encrypt = false;
 
   fd_set readfds;
   fd_set writefds;
@@ -142,9 +144,9 @@ int main(int argc, char *argv[]) {
   int nfds;
   int connectedfd;
   bool hasfriend = true;
-  char *msg_for_friend = NULL;
+  unsigned char *msg_for_friend = NULL;
   int msg_for_friend_length = 0;
-  char *msg_for_us = NULL;
+  unsigned char *msg_for_us = NULL;
   int msg_for_us_length = 0;
 
   nfds = 0;
@@ -183,6 +185,8 @@ int main(int argc, char *argv[]) {
   }
 
   peer myself;
+  Crypto crypto;
+  crypto.set_public_key(NULL);
   myself.set_up(hasfriend, ip, port, NULL, NULL);
   assert((connectedfd = myself.start()) >= 0);
 
@@ -242,24 +246,36 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
+	unsigned char* message = NULL;
+	int bytes_send;
         int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer) - 1);
-
+       
         assert(bytes_read >= 0);
 
         if(bytes_read == 0) {
           fdin_read_ok = false;
           continue;
         }
-
+	
         total_bytes_in += bytes_read;
+
+	if(encrypt){
+	  bytes_send = crypto.encrypt(buffer, bytes_read, message);
+	}
+	else {
+	  message = buffer;
+	  bytes_send = bytes_read;
+	}
 
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
         /* ITEM-n Mask the newline character we get in if it came from stdin ? */
-        msg_for_friend = (char *) realloc(msg_for_friend, msg_for_friend_length + bytes_read);
+        msg_for_friend = (unsigned char *) realloc(msg_for_friend, msg_for_friend_length + bytes_send);
         assert(msg_for_friend != NULL);
 
-        memcpy(msg_for_friend + msg_for_friend_length, buffer, bytes_read);
-        msg_for_friend_length+=bytes_read;
+        memcpy(msg_for_friend + msg_for_friend_length, message, bytes_send);
+	printf("Sending message for friend\n");
+	print_block(msg_for_friend, bytes_send);
+        msg_for_friend_length += bytes_send;
       }
 
       /* Write a message to peer's output fd */
@@ -312,7 +328,7 @@ int main(int argc, char *argv[]) {
           continue;
         }
 
-        msg_for_us = (char *) realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
+        msg_for_us = (unsigned char *)realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
         assert(msg_for_us != NULL);
 
         memcpy(msg_for_us + msg_for_us_length, buffer, bytes_read_tcp);

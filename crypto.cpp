@@ -1,5 +1,5 @@
 #include "crypto.h"
-#include "util.h"
+
 Crypto::Crypto(){
   struct passwd *pw = getpwuid(getuid());
   char *home_dir = pw->pw_dir;
@@ -146,29 +146,14 @@ int Crypto::decrypt(unsigned char* data, int *data_len, unsigned char*& decrypte
   *data_len = data_length;
   return decrypted_length;
   
-  /*
-
-  rval = RSA_private_decrypt(this->private_key_size, (const unsigned char *)data, decrypted, this->private_key, padding);
-
-  if(rval==-1){
-    std::cout<<"Decryption failure: "<<ERR_get_error()<<std::endl;
-    exit(1);
-  }
-
-  return rval;*/
 }
 
 
+/*
+
 int main(int argc, char *argv[]) {
-  /*if(argc<3) {
-    std::cout<<"Usage: /path/to/private/pem /path/to/public/pem message"<<std::endl;
-    exit(1);
-    }*/
   Crypto c;
   c.set_public_key(NULL);
-  
-  //RSA *pr = c.createRSA(argv[1], false);
-  //RSA *pb = c.createRSA(argv[2], true);
   
   unsigned char *msg = (unsigned char*)strdup("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 
@@ -183,12 +168,8 @@ int main(int argc, char *argv[]) {
   // int pr_size = RSA_size(pr);
   // return 1;
 
-  unsigned char *decrypted = NULL;//(unsigned char*)malloc(c.private_key_size);
-  /*if(decrypted == NULL) {
-    std::cout<<"Failed to allocate memory"<<std::endl;
-    exit(1);
-    }*/
-
+  unsigned char *decrypted = NULL;
+  
   elen -=2;
   int dlen = c.decrypt(encrypted, &elen, decrypted);
   printf("Len remaining %d\n", elen);
@@ -202,3 +183,4 @@ int main(int argc, char *argv[]) {
   return 0;
   }
 
+*/

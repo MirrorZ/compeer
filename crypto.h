@@ -9,6 +9,7 @@
 #include <openssl/engine.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
+#include "util.h"
 
 class Crypto {
 
