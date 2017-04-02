@@ -28,6 +28,6 @@ public:
   void set_public_key(char *public_key_path);
   RSA * createRSA(char* filename, bool pub);   // Creates RSA structure from key file
   int encrypt(unsigned char *data, int data_len, unsigned char*& encrypted);
-  int decrypt(unsigned char *data, int* data_len, unsigned char*& decrypted);
+  int decrypt(unsigned char *data, int data_len, unsigned char*& decrypted, int *unencrypted_length);
 };
 #endif /* _CRYPTO_H_ */

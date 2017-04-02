@@ -100,20 +100,21 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char*& encrypted
   printf("=============>IN FUNC (after realloc): %u\n", encrypted);
 
   printf("Returning ");
-  print_block(encrypted, encrypted_length);
+  //print_block(encrypted, encrypted_length);
 
   encrypted_data = encrypted;
   return encrypted_length;
 }
 
-int Crypto::decrypt(unsigned char* data, int *data_len, unsigned char*& decrypted_data){
+int Crypto::decrypt(unsigned char *data, int data_len, unsigned char*& decrypted_data, int *unencrypted_length){
   
   int rval;
   int len, decrypted_length=0;
   unsigned char *block_decrypted = NULL;
   unsigned char *decrypted = NULL;
   unsigned int size = this->private_key_size;
-  int data_length = *data_len;
+  int data_length = data_len;
+  int data_ptr = 0;
   
   while(data_length>=size){
     unsigned char *block_decrypted = (unsigned char*)malloc(size);
@@ -122,15 +123,15 @@ int Crypto::decrypt(unsigned char* data, int *data_len, unsigned char*& decrypte
       exit(1);
     }
      printf("Decrypting\n");
-     //print_block(data, data_len);
+     print_block(data+data_ptr, data_len);
  
-    rval = RSA_private_decrypt(size, (const unsigned char *)data, block_decrypted, this->private_key, padding);
+    rval = RSA_private_decrypt(size, (const unsigned char *)data+data_ptr, block_decrypted, this->private_key, padding);
 
     if(rval==-1){
       std::cout<<"Decryption failure: "<<ERR_get_error()<<std::endl;
       exit(1);
     }
-    data += size;
+    data_ptr += size;
     data_length -= size;
     
     decrypted = (unsigned char *)realloc(decrypted, decrypted_length+rval);
@@ -143,7 +144,9 @@ int Crypto::decrypt(unsigned char* data, int *data_len, unsigned char*& decrypte
   decrypted_data = decrypted;
   printf("\nIn decrypt: %s\n", decrypted);
 
-  *data_len = data_length;
+  print_block(data, data_len);
+  
+  *unencrypted_length = data_length;
   return decrypted_length;
   
 }

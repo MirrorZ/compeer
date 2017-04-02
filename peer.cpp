@@ -49,6 +49,7 @@ public:
     /* STDIN and STDOUT by default */
     fd_input_file = 0;
     fd_output_file = 1;
+
   }
 
   int get_fd_in(void) {
@@ -134,9 +135,7 @@ int main(int argc, char *argv[]) {
 
   unsigned char buffer[1025];
   buffer[1024] = '\0';
-
-  bool encrypt = false;
-
+  
   fd_set readfds;
   fd_set writefds;
   fd_set exceptfds;
@@ -148,6 +147,11 @@ int main(int argc, char *argv[]) {
   int msg_for_friend_length = 0;
   unsigned char *msg_for_us = NULL;
   int msg_for_us_length = 0;
+
+  bool encrypt = true;
+  int unencrypted_length, decrypt_from, total_decrypt_msg_length;
+  unsigned char *decrypt_msg = NULL;
+  total_decrypt_msg_length = unencrypted_length = decrypt_from = 0;
 
   nfds = 0;
   int opt;
@@ -246,26 +250,26 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over peer's input fd */
       if(FD_ISSET(myself.get_fd_in(), &readfds)) {
-	unsigned char* message = NULL;
-	int bytes_send;
+        unsigned char* message = NULL;
+        int bytes_send;
         int bytes_read = read(myself.get_fd_in(), buffer, sizeof(buffer) - 1);
-       
+
         assert(bytes_read >= 0);
 
         if(bytes_read == 0) {
           fdin_read_ok = false;
           continue;
         }
-	
+
         total_bytes_in += bytes_read;
 
-	if(encrypt){
-	  bytes_send = crypto.encrypt(buffer, bytes_read, message);
-	}
-	else {
-	  message = buffer;
-	  bytes_send = bytes_read;
-	}
+        if(encrypt){
+          bytes_send = crypto.encrypt(buffer, bytes_read, message);
+        }
+        else {
+          message = buffer;
+          bytes_send = bytes_read;
+        }
 
         /* We don't care about user pressing Enter directly (bytes_read = 1)*/
         /* ITEM-n Mask the newline character we get in if it came from stdin ? */
@@ -273,13 +277,18 @@ int main(int argc, char *argv[]) {
         assert(msg_for_friend != NULL);
 
         memcpy(msg_for_friend + msg_for_friend_length, message, bytes_send);
-	printf("Sending message for friend\n");
-	print_block(msg_for_friend, bytes_send);
+        printf("Sending message for friend\n");
+        print_block(msg_for_friend, bytes_send);
         msg_for_friend_length += bytes_send;
+
       }
 
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
+
+	if(myself.get_fd_out()==1)
+	  msg_for_us[msg_for_us_length] = '\0';
+	
         int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
 
         assert(bytes_written != -1);
@@ -318,6 +327,8 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
+	unsigned char *message = NULL;
+	int bytes_to_write;
         int bytes_read_tcp = read(connectedfd, buffer, sizeof(buffer) - 1);
 
         assert(bytes_read_tcp != -1);
@@ -328,11 +339,46 @@ int main(int argc, char *argv[]) {
           continue;
         }
 
-        msg_for_us = (unsigned char *)realloc(msg_for_us, msg_for_us_length + bytes_read_tcp);
+	if(encrypt){
+	  /* Append received message to decrypt_msg buffer*/
+	  decrypt_msg = (unsigned char*)realloc(decrypt_msg, total_decrypt_msg_length+bytes_read_tcp);
+	  memcpy(decrypt_msg + total_decrypt_msg_length, buffer, bytes_read_tcp);
+	  total_decrypt_msg_length += bytes_read_tcp;
+	  int data_len = unencrypted_length + bytes_read_tcp;
+
+	  printf("Total decrypt msg_length: %d\n", total_decrypt_msg_length);
+	  printf("Before decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
+
+	  printf("Decrypt_msg looks like:\n");
+	  print_block(decrypt_msg, total_decrypt_msg_length);
+	  printf("Sending to decrypt\n");
+	  print_block(decrypt_msg+decrypt_from, data_len);
+
+	  bytes_to_write = crypto.decrypt(decrypt_msg+decrypt_from, data_len, message, &unencrypted_length); 
+	  if(unencrypted_length==0) {
+	    free(decrypt_msg);
+	    decrypt_msg = NULL;
+	    decrypt_from = 0;
+	  }
+	  else {
+	    decrypt_from = data_len - unencrypted_length;
+	  }
+
+	  printf("\nAfter decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
+	  
+	  printf("After Decrypt_msg looks like:\n");
+	  //print_block(decrypt_msg, data_len);
+	}
+	else{
+	  message = buffer;
+	  bytes_to_write = bytes_read_tcp;
+	}
+
+        msg_for_us = (unsigned char *)realloc(msg_for_us, msg_for_us_length + bytes_to_write);
         assert(msg_for_us != NULL);
 
-        memcpy(msg_for_us + msg_for_us_length, buffer, bytes_read_tcp);
-        msg_for_us_length+=bytes_read_tcp;
+        memcpy(msg_for_us + msg_for_us_length, message, bytes_to_write);
+        msg_for_us_length+=bytes_to_write;
       }
     }
   }
