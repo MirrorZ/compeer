@@ -123,7 +123,7 @@ int Crypto::decrypt(unsigned char *data, int data_len, unsigned char*& decrypted
       exit(1);
     }
      printf("Decrypting\n");
-     print_block(data+data_ptr, data_len);
+     // print_block(data+data_ptr, data_len);
  
     rval = RSA_private_decrypt(size, (const unsigned char *)data+data_ptr, block_decrypted, this->private_key, padding);
 
@@ -144,7 +144,7 @@ int Crypto::decrypt(unsigned char *data, int data_len, unsigned char*& decrypted
   decrypted_data = decrypted;
   printf("\nIn decrypt: %s\n", decrypted);
 
-  print_block(data, data_len);
+  // print_block(data, data_len);
   
   *unencrypted_length = data_length;
   return decrypted_length;
