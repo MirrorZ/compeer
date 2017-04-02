@@ -160,11 +160,11 @@ int main(int argc, char *argv[]) {
   char *file_in = NULL, *file_out = NULL;
 
   if(argc!=6) {
-    fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
+    fprintf(stderr, "Usage: %s [-f | -l] -h HOST -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
     exit(EXIT_FAILURE);
   }
 
-  while((opt = getopt(argc, argv, "lfh:p:i:o:")) != -1) {
+  while((opt = getopt(argc, argv, "lfhp:i:o:")) != -1) {
     switch(opt) {
 
     case 'f':
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
       break;
 
    default:
-     fprintf(stderr, "Usage: %s [-f | -l] -i IP -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
+     fprintf(stderr, "Usage: %s [-f | -l] -h HOST -p PORT [ -i stdinfile ] [ -o stdoutfile ]\n", argv[0]);
      exit(EXIT_FAILURE);
     }
   }
