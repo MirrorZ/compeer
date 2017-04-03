@@ -62,8 +62,8 @@ public:
 
     hasfriend = friendexists;
 
-    printf("Input file: %s\n", infile == NULL ? "NULL": infile);
-    printf("Output file: %s\n", outfile == NULL ? "NULL": outfile);
+    fprintf(stderr,"Input file: %s\n", infile == NULL ? "NULL": infile);
+    fprintf(stderr,"Output file: %s\n", outfile == NULL ? "NULL": outfile);
 
     fd_this_side = socket(AF_INET, SOCK_STREAM, 0);
     assert(fd_this_side != -1);
@@ -143,23 +143,25 @@ int main(int argc, char *argv[]) {
   unsigned char *msg_for_us = NULL;
   int msg_for_us_length = 0;
 
-  bool encrypt = true;
+  bool encrypt = false;
   int unencrypted_length, decrypt_from, total_decrypt_msg_length;
   unsigned char *decrypt_msg = NULL;
   total_decrypt_msg_length = unencrypted_length = decrypt_from = 0;
+
+  /* Redirect stderr to logfile */
 
   nfds = 0;
   int opt;
   char *ip = NULL;
   int port = -1;
   char *file_in=NULL, *file_out=NULL;
-
-  if(argc!=6 && argc!=8 && argc!=10) {
-    fprintf(stderr, "Usage: %s [-f | -l] -h IP -p PORT [-i infile] [-o outfile]\n", argv[0]);
+  
+  if(argc<6 || argc>11) {
+    fprintf(stdout, "Usage: %s [-f | -l] -h IP -p PORT [-i infile] [-o outfile] -e\n", argv[0]);
     exit(EXIT_FAILURE);
   }
 
-  while((opt = getopt(argc, argv, "lfi:p:h:o:")) != -1) {
+  while((opt = getopt(argc, argv, "lfei:p:h:o:")) != -1) {
     switch(opt) {
 
     case 'f':
@@ -172,7 +174,6 @@ int main(int argc, char *argv[]) {
 
     case 'h':
       ip = strdup(optarg);
-      printf("ip is : %s\n", ip);
       break;
 
     case 'p':
@@ -191,8 +192,12 @@ int main(int argc, char *argv[]) {
       strcpy(file_out, optarg);
       break;
 
+    case 'e':
+      encrypt = true;
+      break;
+
    default:
-     fprintf(stderr, "Usage: %s [-f | -l] -h IP -p PORT [-i infile] [-o outfile]\n", argv[0]);
+     fprintf(stdout, "Usage: %s [-f | -l] -h IP -p PORT [-i infile] [-o outfile] -e\n", argv[0]);
      exit(EXIT_FAILURE);
     }
   }
@@ -200,6 +205,15 @@ int main(int argc, char *argv[]) {
   assert(ip!=NULL);
   assert(port!=-1);
 
+  /* Redirect stdout to logfile */
+  char logfile[20];
+  if(hasfriend){
+    sprintf(logfile, "listener.log");
+  }
+  else {
+    sprintf(logfile, "friend.log");
+  }
+  freopen(logfile, "a+", stderr);
 
   peer myself;
   Crypto crypto;
@@ -287,10 +301,7 @@ int main(int argc, char *argv[]) {
         /* ITEM-n Mask the newline character we get in if it came from stdin ? */
         msg_for_friend = (unsigned char *) realloc(msg_for_friend, msg_for_friend_length + bytes_send);
         assert(msg_for_friend != NULL);
-
         memcpy(msg_for_friend + msg_for_friend_length, message, bytes_send);
-        printf("Sending message for friend\n");
-        // print_block(msg_for_friend, bytes_send);
         msg_for_friend_length += bytes_send;
 
       }
@@ -358,13 +369,11 @@ int main(int argc, char *argv[]) {
 	  total_decrypt_msg_length += bytes_read_tcp;
 	  int data_len = unencrypted_length + bytes_read_tcp;
 
-	  printf("Total decrypt msg_length: %d\n", total_decrypt_msg_length);
-	  printf("Before decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
+	  fprintf(stderr, "Total decrypt msg_length: %d\n", total_decrypt_msg_length);
+	  fprintf(stderr, "Before decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
 
-	  printf("Decrypt_msg looks like:\n");
-	  // print_block(decrypt_msg, total_decrypt_msg_length);
-	  printf("Sending to decrypt\n");
-	  // print_block(decrypt_msg+decrypt_from, data_len);
+	  fprintf(stderr,"Sending to decrypt\n");
+	  print_block(decrypt_msg+decrypt_from, data_len);
 
 	  bytes_to_write = crypto.decrypt(decrypt_msg+decrypt_from, data_len, message, &unencrypted_length); 
 	  if(unencrypted_length==0) {
@@ -377,10 +386,8 @@ int main(int argc, char *argv[]) {
 	    decrypt_from = data_len - unencrypted_length;
 	  }
 
-	  printf("\nAfter decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
+	  fprintf(stderr,"\nAfter decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
 
-	  printf("After Decrypt_msg looks like:\n");
-	  //print_block(decrypt_msg, data_len);
 	}
 	else{
 	  message = buffer;
@@ -395,6 +402,5 @@ int main(int argc, char *argv[]) {
       }
     }
   }
-
   return 0;
 }
