@@ -98,15 +98,15 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char*& encrypted
 int Crypto::decrypt(unsigned char *data, int data_len, unsigned char*& decrypted_data, int *unencrypted_length){
   
   int rval;
-  int len, decrypted_length=0;
+  int decrypted_length=0;
   unsigned char *block_decrypted = NULL;
   unsigned char *decrypted = NULL;
   unsigned int size = this->private_key_size;
-  int data_length = data_len;
+  unsigned int data_length = data_len;
   int data_ptr = 0;
   
   while(data_length>=size){
-    unsigned char *block_decrypted = (unsigned char*)malloc(size);
+    block_decrypted = (unsigned char*)malloc(size);
     if(block_decrypted == NULL) {
       std::cout<<"Failed to allocate memory"<<std::endl;
       exit(1);
