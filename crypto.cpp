@@ -20,7 +20,6 @@ void Crypto::set_public_key(char *public_key_path){
     char path[50] = ".vault/public.pem";
     public_key_path = path;
   }
-  fprintf(stderr, "\npublic key: %s\n", public_key_path);
   createRSA(public_key_path, true);
   
   /* For RSA_PKCS1_PADDING maximum message length can be the key size - 11 */
@@ -49,7 +48,6 @@ RSA * Crypto::createRSA(char* filename, bool pub){
     }
     this->public_key = rsa;
     this->public_key_size = RSA_size(rsa);
-    fprintf(stderr, "Public Key loaded\n");
     return this->public_key;
   }
   else {
@@ -60,7 +58,6 @@ RSA * Crypto::createRSA(char* filename, bool pub){
     }
     this->private_key = rsa;
     this->private_key_size = RSA_size(rsa);
-    fprintf(stderr, "Private key loaded\n");
     return this->private_key;
   }
   return NULL;
@@ -70,7 +67,6 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char*& encrypted
   int rval;
   int len, encrypted_length=0;
   unsigned char *encrypted = NULL;
-  fprintf(stderr,"\n=============>IN FUNC: %s\n", encrypted);
 
   while(data_len!=0){
     len = data_len > this->max_message_length ? this->max_message_length : data_len;
@@ -94,8 +90,6 @@ int Crypto::encrypt(unsigned char *data, int data_len, unsigned char*& encrypted
     
     encrypted_length += rval;
   }
-  
-  fprintf(stderr, "=============>IN FUNC (after realloc): %s\n", encrypted);
 
   encrypted_data = encrypted;
   return encrypted_length;
@@ -117,7 +111,6 @@ int Crypto::decrypt(unsigned char *data, int data_len, unsigned char*& decrypted
       std::cout<<"Failed to allocate memory"<<std::endl;
       exit(1);
     }
-    fprintf(stderr,"Decrypting\n");
  
     rval = RSA_private_decrypt(size, (const unsigned char *)data+data_ptr, block_decrypted, this->private_key, padding);
 
@@ -136,7 +129,6 @@ int Crypto::decrypt(unsigned char *data, int data_len, unsigned char*& decrypted
   }
 
   decrypted_data = decrypted;
-  fprintf(stderr,"\nIn decrypt: %s\n", decrypted);
   
   *unencrypted_length = data_length;
   return decrypted_length;

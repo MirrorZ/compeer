@@ -62,9 +62,6 @@ public:
 
     hasfriend = friendexists;
 
-    fprintf(stderr,"Input file: %s\n", infile == NULL ? "NULL": infile);
-    fprintf(stderr,"Output file: %s\n", outfile == NULL ? "NULL": outfile);
-
     fd_this_side = socket(AF_INET, SOCK_STREAM, 0);
     assert(fd_this_side != -1);
 
@@ -148,8 +145,6 @@ int main(int argc, char *argv[]) {
   unsigned char *decrypt_msg = NULL;
   total_decrypt_msg_length = unencrypted_length = decrypt_from = 0;
 
-  /* Redirect stderr to logfile */
-
   nfds = 0;
   int opt;
   char *ip = NULL;
@@ -213,7 +208,6 @@ int main(int argc, char *argv[]) {
   else {
     sprintf(logfile, "friend.log");
   }
-  freopen(logfile, "a+", stderr);
 
   peer myself;
   Crypto crypto;
@@ -369,12 +363,6 @@ int main(int argc, char *argv[]) {
 	  total_decrypt_msg_length += bytes_read_tcp;
 	  int data_len = unencrypted_length + bytes_read_tcp;
 
-	  fprintf(stderr, "Total decrypt msg_length: %d\n", total_decrypt_msg_length);
-	  fprintf(stderr, "Before decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
-
-	  fprintf(stderr,"Sending to decrypt\n");
-	  print_block(decrypt_msg+decrypt_from, data_len);
-
 	  bytes_to_write = crypto.decrypt(decrypt_msg+decrypt_from, data_len, message, &unencrypted_length); 
 	  if(unencrypted_length==0) {
 	    free(decrypt_msg);
@@ -385,9 +373,6 @@ int main(int argc, char *argv[]) {
 	  else {
 	    decrypt_from = data_len - unencrypted_length;
 	  }
-
-	  fprintf(stderr,"\nAfter decryption decrypt_from:%d, data_len:%d, unencryptd_length:%d\n", decrypt_from, data_len, unencrypted_length);
-
 	}
 	else{
 	  message = buffer;
