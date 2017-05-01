@@ -14,9 +14,10 @@ Crypto::Crypto(){
 }
 
 void Crypto::set_public_key(char *public_key_path){
-  
+
   if(public_key_path == NULL) {
-    printf("Using default public key path .vault/public.pem");
+    struct passwd *pw = getpwuid(getuid());
+    printf("Using default public key path %s/.vault/public.pem", pw->pw_dir);
     char path[50] = ".vault/public.pem";
     public_key_path = path;
   }
@@ -27,7 +28,6 @@ void Crypto::set_public_key(char *public_key_path){
 }
 
 RSA * Crypto::createRSA(char* filename, bool pub){
-  fprintf(stderr, "Got filename: %s\n", filename);
   OpenSSL_add_all_algorithms();
   OpenSSL_add_all_ciphers();
   ERR_load_crypto_strings();
