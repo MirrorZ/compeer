@@ -125,9 +125,10 @@ public:
 
 int main(int argc, char *argv[]) {
 
-  unsigned char buffer[1025];
-  buffer[1024] = '\0';
-  
+  int buffsize = 1024;
+  unsigned char buffer[buffsize+1];
+  buffer[buffsize] = '\0';
+
   fd_set readfds;
   fd_set writefds;
   fd_set exceptfds;
@@ -150,7 +151,7 @@ int main(int argc, char *argv[]) {
   char *ip = NULL;
   int port = -1;
   char *file_in=NULL, *file_out=NULL;
-  
+
   if(argc<6 || argc>11) {
     fprintf(stdout, "Usage: %s [-f | -l] -h IP -p PORT [-i infile] [-o outfile] -e\n", argv[0]);
     exit(EXIT_FAILURE);
@@ -199,15 +200,6 @@ int main(int argc, char *argv[]) {
 
   assert(ip!=NULL);
   assert(port!=-1);
-
-  /* Redirect stdout to logfile */
-  char logfile[20];
-  if(hasfriend){
-    sprintf(logfile, "listener.log");
-  }
-  else {
-    sprintf(logfile, "friend.log");
-  }
 
   peer myself;
   Crypto crypto;
@@ -303,9 +295,6 @@ int main(int argc, char *argv[]) {
       /* Write a message to peer's output fd */
       if(FD_ISSET(myself.get_fd_out(), &writefds) && msg_for_us_length > 0) {
 
-	if(myself.get_fd_out()==1)
-	  msg_for_us[msg_for_us_length] = '\0';
-	
         int bytes_written = write(myself.get_fd_out(), msg_for_us, msg_for_us_length);
 
         assert(bytes_written != -1);
@@ -344,8 +333,8 @@ int main(int argc, char *argv[]) {
 
       /* Got a message over TCP */
       if(FD_ISSET(connectedfd, &readfds)) {
-	unsigned char *message = NULL;
-	int bytes_to_write;
+        unsigned char *message = NULL;
+        int bytes_to_write;
         int bytes_read_tcp = read(connectedfd, buffer, sizeof(buffer) - 1);
 
         assert(bytes_read_tcp != -1);
@@ -356,28 +345,28 @@ int main(int argc, char *argv[]) {
           continue;
         }
 
-	if(encrypt){
-	  /* Append received message to decrypt_msg buffer*/
-	  decrypt_msg = (unsigned char*)realloc(decrypt_msg, total_decrypt_msg_length+bytes_read_tcp);
-	  memcpy(decrypt_msg + total_decrypt_msg_length, buffer, bytes_read_tcp);
-	  total_decrypt_msg_length += bytes_read_tcp;
-	  int data_len = unencrypted_length + bytes_read_tcp;
+        if(encrypt){
+          /* Append received message to decrypt_msg buffer*/
+          decrypt_msg = (unsigned char*)realloc(decrypt_msg, total_decrypt_msg_length+bytes_read_tcp);
+          memcpy(decrypt_msg + total_decrypt_msg_length, buffer, bytes_read_tcp);
+          total_decrypt_msg_length += bytes_read_tcp;
+          int data_len = unencrypted_length + bytes_read_tcp;
 
-	  bytes_to_write = crypto.decrypt(decrypt_msg+decrypt_from, data_len, message, &unencrypted_length); 
-	  if(unencrypted_length==0) {
-	    free(decrypt_msg);
-	    decrypt_msg = NULL;
-	    total_decrypt_msg_length = 0;
-	    decrypt_from = 0;
-	  }
-	  else {
-	    decrypt_from = data_len - unencrypted_length;
-	  }
-	}
-	else{
-	  message = buffer;
-	  bytes_to_write = bytes_read_tcp;
-	}
+          bytes_to_write = crypto.decrypt(decrypt_msg+decrypt_from, data_len, message, &unencrypted_length);
+          if(unencrypted_length==0) {
+            free(decrypt_msg);
+            decrypt_msg = NULL;
+            total_decrypt_msg_length = 0;
+            decrypt_from = 0;
+          }
+          else {
+            decrypt_from = data_len - unencrypted_length;
+          }
+        }
+        else{
+          message = buffer;
+          bytes_to_write = bytes_read_tcp;
+        }
 
         msg_for_us = (unsigned char *)realloc(msg_for_us, msg_for_us_length + bytes_to_write);
         assert(msg_for_us != NULL);

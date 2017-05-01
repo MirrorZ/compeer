@@ -16,7 +16,7 @@
 class Crypto {
 
 public:
-  
+
   RSA *public_key;
   RSA *private_key;
   unsigned int public_key_size;

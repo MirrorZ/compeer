@@ -4,7 +4,7 @@
 int main(int argc, char *argv[]) {
   Crypto c;
   c.set_public_key(NULL);
-  
+
   unsigned char *msg = (unsigned char*)strdup("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   //unsigned char *msg = (unsigned char*)strdup("aaaaa");
   //int pb_size = RSA_size(pb);
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
   // int pr_size = RSA_size(pr);
   // return 1;
   unsigned char *decrypted = NULL;
-  
+
   elen -=2;
   int dlen = c.decrypt(encrypted, &elen, decrypted);
   printf("Len remaining %d\n", elen);
@@ -26,6 +26,6 @@ int main(int argc, char *argv[]) {
   dlen = c.decrypt(encrypted, &elen, decrypted);
   decrypted[dlen]='\0';
   printf("Decrypted data [%d]: %s\n", dlen, decrypted);
-  
+
   return 0;
 }

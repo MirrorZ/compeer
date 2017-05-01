@@ -2,7 +2,7 @@
 
 Decentralised peer to peer messaging
 
-### Generating key pair 
+### Generating key pair
 Use openssl to generate key pair for encrypted communication:
 
  ```

@@ -3,7 +3,7 @@
 class logger {
   const char *logfile;
   FILE *fp = NULL;
-  
+
   public:
   logger(const char *path);
   ~logger();
