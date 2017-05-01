@@ -9,7 +9,7 @@ Crypto::Crypto(){
   strcpy(private_key_path, home_dir);
   strcat(private_key_path, "/.ssh/private.pem");
   private_key_path[sz+17] = '\0';
-  fprintf(stderr, "\nprivate key: %s\n", private_key_path);
+  fprintf(stderr, "\nPrivate key path: %s\n", private_key_path);
   createRSA(private_key_path, false);
 }
 
@@ -17,7 +17,7 @@ void Crypto::set_public_key(char *public_key_path){
 
   if(public_key_path == NULL) {
     struct passwd *pw = getpwuid(getuid());
-    printf("Using default public key path %s/.vault/public.pem", pw->pw_dir);
+    printf("Public key path: %s/.vault/public.pem\n", pw->pw_dir);
     char path[50] = ".vault/public.pem";
     public_key_path = path;
   }
