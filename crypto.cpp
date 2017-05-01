@@ -125,7 +125,6 @@ int Crypto::decrypt(unsigned char *data, int data_len, unsigned char*& decrypted
     for(int i=0; i<rval; i++)
       decrypted[i+decrypted_length] = block_decrypted[i];
     decrypted_length += rval;
-    fprintf(stderr,"Decrypted_length: %d\n", decrypted_length);
   }
 
   decrypted_data = decrypted;
