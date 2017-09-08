@@ -1,9 +1,9 @@
 # Usage: 
-#      . compeer.bash
-#      source compeer.bash
+#      . aliases
+#      source aliases
 #
 # Add to ~/.bashrc:
-# echo 'source $HOME/compeer/compeer.bash' >> $HOME/.bashrc
+# echo 'source $HOME/compeer/aliases' >> $HOME/.bashrc
 
 unset ENCFLAG
 # Set to 0 to disable.
