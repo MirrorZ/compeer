@@ -202,8 +202,12 @@ int main(int argc, char *argv[]) {
   assert(port!=-1);
 
   peer myself;
-  Crypto crypto;
-  crypto.set_public_key(NULL);
+
+  Crypto crypto(encrypt);
+  if(encrypt) {
+    crypto.set_public_key(NULL);
+  }
+
   myself.set_up(hasfriend, ip, port, file_in, file_out);
   assert((connectedfd = myself.start()) >= 0);
 

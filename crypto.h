@@ -24,7 +24,7 @@ public:
   int padding = RSA_PKCS1_PADDING;
   int max_message_length;
 
-  Crypto();
+  Crypto(bool);
   void set_public_key(char *public_key_path);
   RSA * createRSA(char* filename, bool pub);   // Creates RSA structure from key file
   int encrypt(unsigned char *data, int data_len, unsigned char*& encrypted);

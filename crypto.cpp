@@ -1,16 +1,22 @@
 #include "crypto.h"
 
-Crypto::Crypto(){
-  struct passwd *pw = getpwuid(getuid());
-  char *home_dir = pw->pw_dir;
-  int sz = strlen(home_dir);
+Crypto::Crypto(bool encrypt){
 
-  char *private_key_path = (char *)malloc(sz+17);
-  strcpy(private_key_path, home_dir);
-  strcat(private_key_path, "/.ssh/private.pem");
-  private_key_path[sz+17] = '\0';
-  fprintf(stderr, "\nPrivate key path: %s\n", private_key_path);
-  createRSA(private_key_path, false);
+  if(encrypt) {
+    struct passwd *pw = getpwuid(getuid());
+    char *home_dir = pw->pw_dir;
+    int sz = strlen(home_dir);
+
+    char *private_key_path = (char *)malloc(sz+17);
+    strcpy(private_key_path, home_dir);
+    strcat(private_key_path, "/.ssh/private.pem");
+    private_key_path[sz+17] = '\0';
+    fprintf(stderr, "\nPrivate key path: %s\n", private_key_path);
+    createRSA(private_key_path, false);
+  }
+  else {
+    fprintf(stdout, "\Encryption is turned off.\n\n");
+  }
 }
 
 void Crypto::set_public_key(char *public_key_path){

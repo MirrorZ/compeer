@@ -6,7 +6,7 @@ Decentralised peer to peer messaging
 on Ubuntu, libssl-dev is required to build.
 For other systems, find a similar package, (openssl/rsa.h)
 
-Compile with: g++ crypto.cpp peer.cpp -lcrypto
+Compile with: g++ peer.cpp crypto.cpp -lcrypto
 
 ---
 
